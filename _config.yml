@@ -19,10 +19,9 @@
 # in the templates via {{ site.myvariable }}.
 
 title: Egor's blog
-email: holyblckcat@gmail.com
 description: >-
   A blog about C++ and more.
-baseurl: "" # the subpath of your site, e.g. /blog
+baseurl: "/blog" # the subpath of your site, e.g. /blog
 url: "" # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: holyblckcat
 github_username:  holyblackcat
