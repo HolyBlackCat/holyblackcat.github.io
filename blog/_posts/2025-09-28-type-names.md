@@ -181,6 +181,27 @@ This is good enough to give portable names for simple classes, but there are sti
 
 As you can see, there are still some differences: `__cxx11`, and spaces after `,`s. And it's a bit sad that this doesn't just print `"std::string"`.
 
+### Limitations and unique features of `typeid`
+
+And lastly, `typeid` has certain quirks/properties that should be kept in mind:
+
+* `typeid` ignores cvref (reference-ness, `const`ness and `volatile`) of the type. E.g. `typeid(const int &).name()` is same as `typeid(int).name()`.
+
+* `typeid` can be used at runtime to determine the true type<sup>1</sup> of a polymorphic<sup>2</sup> object. For example:
+
+  ```cpp
+  struct A {virtual ~A() = default;}; // Need at least one virtual function to make `A` polymorphic.
+  struct B : A {};
+
+  A *p = new B;
+  std::cout << typeid(*p).name() << '\n'; // Same as `typeid(B).name()`.
+  ```
+
+  This is something that only `typeid` can do, and not the [alternative approach](#at-compile-time-using-function-names) that's described next.
+
+  <sub><sup>1</sup> More correctly called its "dynamic type".</sub><br/>
+  <sub><sup>2</sup> A *polymorphic* class is a class that has at least one virtual function.</sub>
+
 ## At compile-time, using function names
 
 There's a second, completely different approach to getting the names:
