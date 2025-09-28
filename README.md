@@ -20,6 +20,14 @@ Install Ruby: `sudo pacman -S --needed ruby`
 
   And add the `.bundle` directory to `.gitignore`. Everything else should already be added to it by default.
 
+* Or when coming back to an existing blog:
+
+  ```sh
+  sudo gem update --system
+  bundle update
+  gem install jekyll
+  ```
+
 ```sh
 # Tell `bundle` to install packages relative to the user dir (to match where `gem` installs them).
 cd my_blog
