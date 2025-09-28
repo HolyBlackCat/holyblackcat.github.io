@@ -20,6 +20,8 @@ Both produce compiler-dependent names. (1) gives the same names on GCC and Clang
 
 To get names that are more consistent across compilers, you can use my library [cppdecl](https://github.com/MeshInspector/cppdecl), which applies some heuristics to normalize those names as much as possible.
 
+When [reflection](#reflection) gets implemented, we'll have another way of obtaining compile-time names, as an alterantive to (2).
+
 ## At runtime, using `typeid(T).name()`
 
 This is the first thing that people see when googing the topic, and in line with C++ traditions it does the wrong thing by default:
@@ -364,9 +366,46 @@ As mentioned at the beginning of the post, I've made a library called [cppdecl](
 
 It wraps either `typeid(T).name()` or the `.function_name()`-based approach, and then applies a large collection of rewrite rules to the result, to make the names as consistent as possible across compilers. Like in the example above, all those transformations are performed at compile-time.
 
+## Reflection
+
+And lastly...
+
+C++26 finally got a feature called *reflection*, which among other things should make obtaining type names easier.
+
+At the time of writing this, it's not implemented in any of the major compilers yet. All we have is an experiemental Clang fork that supports it.
+
+Here's a small test program that you can run on that fork: ([godbolt link][2])
+
+```cpp
+#include <iostream>
+#include <meta>
+#include <string_view>
+#include <string>
+
+template <typename T>
+[[nodiscard]] consteval std::string_view TypeName()
+{
+    return std::meta::display_string_of(^^T);
+}
+
+int main()
+{
+    std::cout << TypeName<std::string>() << '\n'; // basic_string<char, char_traits<char>, allocator<char>>
+    std::cout << std::meta::display_string_of(^^std::string) << '\n'; // string
+}
+```
+
+The standard [doesn't specify](https://eel.is/c++draft/meta.reflection.names#5) the exact names that should be returned, but we can already see that:
+
+1. You can pass `typedef`s without expanding them, which wasn't possible before.
+2. The namespaces are omitted from the name.
+
+(2) looks concerning, but I expect that either this will change, or there will be an alternative way of getting those namespaces.
 
 &nbsp;
 
 Thanks for reading!
 
 [1]: https://gcc.godbolt.org/#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGIAKykrgAyeAyYAHI%2BAEaYxCAA7AmkAA6oCoRODB7evgGp6ZkCoeFRLLHxSbaY9o4CQgRMxAQ5Pn6BdpgOWQ1NBCWRMXGJyQqNza15HeP9YYPlw0kAlLaoXsTI7BzmAMxhyN5YANQmO25NxEwAnqfYJhoAgrv7h5gnZ8hj6FhUt/dPZj2DAOXmOpzcTjGxEwrD%2Bj2ewNe7zcCjWG0wAH1aKhRHUGHCAUCQWCzlCwsAMQA3PCYADuBIRxLe4LJRgZ8P8Vk5DAweAUomI6BM/gAIsKRUc0AwxphVCliEcviAQKzgEcAEqYFIGTYQJUqgjEclUmm0xVozakRUEdDK1UmulHJhW/X26mO6JLf4mBJWR5HAPW20Go1GI7QginP1Pf2B114ABemIIkvWGLSCij/0DQbtieTRwMY3T6XeEo0WfhsYDtIQdDeUGQaYzZfN602ADoaAx0BBnYWmMWM0slkcwGBThLXYbycqGMPs4GfdGczmIx2mCkUq49RbMFaiwQSworU3iMejgBaAdD9JenYr1cBiMnSyTo7RSsPJ8Bw8X99nv%2BlhOh2GRJhA96PgGPpilW36Buum7bj2u7tvuN5HguD6Ls%2BmAEOsDDhnhX4wd6HJchYPL4PyTRCqK4qSgIMpygq06hmqDzoNoXhjAAKlc256jadozkYDpmgQAmYF68K%2Bjhr57FQPxHBiACyQhuBiABq2DqvJbHkkRKbvpq2pMLqknbla5hmAcg4KK%2BZjWWYZg2ZB8kviZWo6pgEARs5ZhQl4DiOQFblfmueGtqZPl%2BXhAVeAwWShY54XYdWRnRd55m%2Bf5jmMD4KU2WlUFGQRRkRUugI1Eo8kAPR1UcvF1g5CgIGstDoB%2BbzcWMJwAGwaAZRgQJZ0kmINVrRF4KZuAYYZ8h%2BXjAMAmC2kcCAEAQKQKCADXAIQCBeNEHZoCwdW0LQlLnZd12XvKqDaF0BB1XyCheJgCh1Vw/VcBoCRcB5eHlcNwCjVJHboEwjQQVaY2Q9DTAQa%2BFhHPDYG%2BSOlXQdVPZ4L8smwTGDwEJgLBmaTyJjcwbBNQSUrMfKjHSimyAIE0RwAFTqkwtL8duESsJj3pyRlEYg8JKp7liOLQ1kypntCggQV2iXdAIGI08L6VPAkRP/EFIU83zUmC2wABiJAsNDIulfGSYYim8qYDQqhYowrYVjrOb2wW71UK77uEe%2BXvRqROv/AzpMsRqvP85EQuW8Q1sppctKO1JmtCxi/DJ9DrbClyYqi/BAag%2BJRxhEeWvRXHptC%2BCVe3BB2OxybAuJ1b%2BcRq367O4H9DBzsEpV1nbAdsQ3a9jZTcue5Yt4aBXgB3gbuD62o9a6B%2BbI9eOxXkZHb96vQe98DxCET3Ed6y3EePKT5MGJT4LU0LdM7HcjxR7KTOg019dsGCKgWkLdZJ20lm6U0Rwa4mTrh3Ng4JeLN3nqXaBQsJ5k1QJSTEx9VB%2BV5hnbcY9MS5xTkfaEA9GAoJzFvaELAsGYn9q7fB6cxrEJzl3AgS8V5ryoWffCF8jicV6gQeOEAtYoNInBB%2BFNmRnFfrTJBH9I5MWjkzJgM1UBo0zlrDEFxrgF05OKZc8lv4x19o7aBrZ45m0wEA%2BkZwlHYBVhjW%2B4DgyqnDLzaxAC7HAMQcgqMRwGpNQQG8Kgas8RHBYDxFMsRJRiHoF1AgtI8CWiOLnI4qBoj8nWG8Nw1hrBEUHExK0%2Bd6CDhTPnAgYS0Z4FpqgKgRxaRGkcGGGpfIOz6Ulvom4Hx2ZkCsUUwGH8KpyT1q3TJQkPH5ksXgT2QT5ngmgYswplgZKoMipGTkeAGLvjToXXZ9FvYIXPpfYi18RRuLIiTMmsiqZSRrk470RjuS8hooKYxopmaM1YhA0SFJ3RmhsULUButSpRydJo18/VPLD20UQ3RvSAnKJObhARwdfTrihjDFYh8cVI1HEU9crjRzXkBhMy5NyQmXlpTcuyCgHKqSuHNeyJxxlijvg8Ku0SmBhDBSYjK%2Bo0AzWRMskFCCzjMtZYy5BYqzhjm2P4NwDAwDbEuRwFYtBOD%2BF4H4DgWhSCoE4AUt8wFURoQUjwUgBBNCapWAAawCBofQnBJB6rtUazgvBdouttQazVpA4CwCQGdFI9YyAUAgGGiNKB5rADMFwP6fA6Ck2ILtCA0RPXRDCE0K4nBrU5uYMQK4AB5aIT0HAFt4GdNgghS0MFoPmgNpAsDTWAOcS6u1uC8CwNbIw4gW34GhN0bB3bDWyi6DNLY1qq41E9bQPA0RLglo8FgT1M4WDVtINg4g0R0iYBFGTQwwBF1GDtSsKgBhgAKC0qaUtyFt38EECIMQ7ApAyEEIoFQ6gW26C4PoE9KA1k2EXTk%2BAKxUApDxN2y8XxJymDNRYMw/UrwAHVEnodlIaJgV5txQ0EGky8cRiAkAULwBhxAjRYF2pAFYnR1Z%2BAgK4SYfgAMhDmGUCoegMxFGyJ4NoPHCh4gGFx4YAGGN4l6BMATeQJM1Gej0GYomhjxAkzMVjegxh9BUwsNT9G9wSC1Tqj1LbjUcCOKoAAHP1S8/VJCSnjUcRNHYuAdg0EcCAuBCAkCtUsXg/qtAjlIGEpgWB4iwydf4F12qODutIPqw15mfUgD9Re4zHAzCmaS96m16Wd1xAyM4SQQA
+
+[2]: https://gcc.godbolt.org/#g:!((g:!((g:!((h:codeEditor,i:(filename:'1',fontScale:14,fontUsePx:'0',j:1,lang:c%2B%2B,selection:(endColumn:2,endLineNumber:16,positionColumn:1,positionLineNumber:1,selectionStartColumn:2,selectionStartLineNumber:16,startColumn:1,startLineNumber:1),source:'%23include+%3Ciostream%3E%0A%23include+%3Cmeta%3E%0A%23include+%3Cstring_view%3E%0A%23include+%3Cstring%3E%0A%0Atemplate+%3Ctypename+T%3E%0A%5B%5Bnodiscard%5D%5D+consteval+std::string_view+TypeName()%0A%7B%0A++++return+std::meta::display_string_of(%5E%5ET)%3B%0A%7D%0A%0Aint+main()%0A%7B%0A++++std::cout+%3C%3C+TypeName%3Cstd::string%3E()+%3C%3C+!'%5Cn!'%3B+//+basic_string%3Cchar,+char_traits%3Cchar%3E,+allocator%3Cchar%3E%3E%0A++++std::cout+%3C%3C+std::meta::display_string_of(%5E%5Estd::string)+%3C%3C+!'%5Cn!'%3B+//+string%0A%7D'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:49.483806065945224,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:clang_bb_p2996,filters:(b:'0',binary:'1',binaryObject:'1',commentOnly:'0',debugCalls:'1',demangle:'1',directives:'0',execute:'0',intel:'0',libraryCode:'1',trim:'1',verboseDemangling:'0'),flagsViewOpen:'1',fontScale:14,fontUsePx:'0',j:2,lang:c%2B%2B,libs:!(),options:'-std%3Dc%2B%2B26',overrides:!((name:toolchain,value:/opt/compiler-explorer/gcc-snapshot)),paneName:Clang,selection:(endColumn:1,endLineNumber:1,positionColumn:1,positionLineNumber:1,selectionStartColumn:1,selectionStartLineNumber:1,startColumn:1,startLineNumber:1),source:1),l:'5',n:'0',o:Clang,t:'0')),header:(),k:50.51619393405478,l:'4',m:50.68770953065135,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compilerName:'x86-64+clang+21.1.0',editorid:1,fontScale:14,fontUsePx:'0',j:2,wrap:'1'),l:'5',n:'0',o:'Output+of+x86-64+clang+(reflection+-+C%2B%2B26)+(Compiler+%232)',t:'0')),l:'4',m:49.31229046934866,n:'0',o:'',s:0,t:'0')),k:50.51619393405478,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4
