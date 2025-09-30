@@ -7,7 +7,7 @@ toc: true
 
 ## TL;DR:
 
-Getting the type names as strings can be useful: for debugging purposes, for registering classes in factories, etc.
+Getting the type names as strings can be useful for: debugging purposes, registering classes in factories, etc. This post summarizes the known approaches to getting the type names.
 
 There are two methods of obtaining those names:
 
