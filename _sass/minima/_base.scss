@@ -160,11 +160,10 @@ a {
  * Blockquotes
  */
 blockquote {
-    color: $grey-color;
+    color: rgb(110, 110, 110);
     border-left: 4px solid $grey-color-light;
     padding-left: $spacing-unit * 0.5;
-    @include relative-font-size(1.125);
-    letter-spacing: -1px;
+    @include relative-font-size(1);
     font-style: italic;
 
     > :last-child {
