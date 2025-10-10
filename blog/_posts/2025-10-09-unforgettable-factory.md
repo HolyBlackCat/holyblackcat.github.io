@@ -256,7 +256,7 @@ There are several ways around this:
       (void)register_animal;
   }
   ```
-  Since according to my tests, it turns out that virtual functions get instantiated unconditionally, even if unused. (The standard seems to be ambiguous on whether it's [unspecified](https://eel.is/c++draft/temp.spec#temp.inst-11) or [required](https://eel.is/c++draft/basic.def.odr#8) for them to always be instantiated.)
+  Since according to my tests, it turns out that virtual functions get instantiated unconditionally, even if unused. (The standard seems to be ambiguous on whether it's [unspecified](https://timsong-cpp.github.io/cppwp/n4950/temp.spec#temp.inst-11) or [required](https://timsong-cpp.github.io/cppwp/n4950/basic.def.odr#8) for them to always be instantiated.)
 
   The problem with this approach is that we're wasting a slot in the vtable on an unused function (which probably doesn't matter in practice, but is uncool). You could try to put this into a virtual destructor to avoid wasting a slot, but turns out that `virtual` doesn't have its magic properties there for some reason, so this ends up having the same problems as instantiating it in the constructor.
 
@@ -291,17 +291,17 @@ This little trick is why I'm writing this blog post.
 
 ## Is this behavior guaranteed?
 
-It seems to be. [`[temp.inst]/4`](https://eel.is/c++draft/temp.spec#temp.inst-4) somewhat vaguely says that:
+It seems to be. [`[temp.inst]/4`](https://timsong-cpp.github.io/cppwp/n4950/temp.spec#temp.inst-4) somewhat vaguely says that:
 
 > ... a member of a templated class ... is implicitly instantiated when ... referenced in a context that requires the member definition to exist or if the existence of the definition of the member affects the semantics of the program; ...
 
-And then passing `&register_animal` as a template argument ODR-uses this variable: [`[basic.def.odr]/5`](https://eel.is/c++draft/basic.def.odr#5)
+And then passing `&register_animal` as a template argument ODR-uses this variable: [`[basic.def.odr]/5`](https://timsong-cpp.github.io/cppwp/n4950/basic.def.odr#5)
 
 > ... A variable ... that is named by a potentially-evaluated expression ... is odr-used by \[it] unless \[some conditions that don't apply here]
 
-Template arguments appear to count as potentially-evaluated, since they aren't listed among the exceptions in [`[basic.def.odr]/3`](https://eel.is/c++draft/basic.def.odr#3).
+Template arguments appear to count as potentially-evaluated, since they aren't listed among the exceptions in [`[basic.def.odr]/3`](https://timsong-cpp.github.io/cppwp/n4950/basic.def.odr#3).
 
-And the variable being ODR-used requires it to be defined: [`[basic.def.odr]/12`](https://eel.is/c++draft/basic.def.odr#12)
+And the variable being ODR-used requires it to be defined: [`[basic.def.odr]/12`](https://timsong-cpp.github.io/cppwp/n4950/basic.def.odr#11)
 
 > Every program shall contain at least one definition of every function or variable that is odr-used in that program ... \[plus some unrelated exceptions]
 
@@ -321,7 +321,7 @@ This includes our CRTP trick if you use it in headers.
 
 This applies to any trick based on the constructors of global/static variables.
 
-The standard contains this curious paragraph: [`[basic.start.dynamic]/5`](https://eel.is/c++draft/basic.start#dynamic-5)
+The standard contains this curious paragraph: [`[basic.start.dynamic]/5`](https://timsong-cpp.github.io/cppwp/n4950/basic.start#dynamic-5)
 
 > It is implementation-defined whether the dynamic initialization of a non-block non-inline variable with static storage duration is sequenced before the first statement of main or is deferred. If it is deferred, it strongly happens before any non-initialization odr-use of any non-inline function or non-inline variable defined in the same translation unit as the variable to be initialized.
 
