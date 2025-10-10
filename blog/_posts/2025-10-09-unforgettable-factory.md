@@ -100,7 +100,7 @@ static const int register_animal = []{
 // dog.h
 struct Dog : Animal
 {
-    void Say() override {std::cout << "Meow!\n";}
+    void Say() override {std::cout << "Bark!\n";}
 };
 
 // dog.cpp
