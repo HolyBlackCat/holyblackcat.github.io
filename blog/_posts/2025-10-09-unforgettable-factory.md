@@ -131,7 +131,7 @@ Several things to note:
       return 0;
   }();
   ```
-  to register itself in the map. Since this is a global variable, it's constructed at program startup, before the `main()` function is entered, so that's when the lambda runs.
+  to register itself in the map. Since `register_animal` is a global variable, it's constructed at program startup, before the `main()` function is entered, so that's when the lambda runs.
 
   This way we don't need a single big source file that knows all derived classes, and we can even load new classes at runtime from shared libraries.
 
@@ -182,6 +182,8 @@ Several things to note here:
 
   This macro is non-standard, but all three big compilers (Clang, GCC, MSVC) support it nontheless. There are several alternatives (e.g. `__LINE__`; or the aforementioned variable templates, which make those usable in headers), but they aren't worth discussing, because we have better registration approaches than those macros.
 
+  And if you're wondering, using `CAT(..., T)` as the variable name isn't an option, because `T` can contain `::`, `<...>`, etc.
+
 ## Registration via CRTP
 
 *CRTP* stands for the *Curiously Recurring Template Pattern*. It refers to the technique of inheriting a class from a template that uses the same class as its template argument, i.e. `struct A : B<A> {...};`.
@@ -210,7 +212,7 @@ struct MakeAnimal : Animal
     inline static int register_animal = Register();
 };
 ```
-This immediately presents a challenge: How do we get the name of `T` as a string? Since this is a template rather than a macro, we can no longer use `#`. This is a topic for a [whole separate post](/blog/2025/09/28/type-names.html). I'm going to assume that you've implemented one of the techniques from that post, and here I'm going to use `std::string(cppdecl::TypeName<T>())` from my [library](https://github.com/MeshInspector/cppdecl) mentioned there.
+This immediately presents a challenge: How do we get the name of `T` as a string? Since this is a template rather than a macro, we can no longer use `#T`. This is a topic for a [whole separate post](https://holyblackcat.github.io/blog/2025/09/28/type-names.html). I'm going to assume that you've implemented one of the techniques from that post, and here I'm going to use `std::string(cppdecl::TypeName<T>())` from my [library](https://github.com/MeshInspector/cppdecl) mentioned there.
 
 Also notice that we've replaced the lambda with a `static` function, because MSVC chokes on the lambda otherwise (which I assume is a compiler bug, but it didn't investigate this further).
 
@@ -224,6 +226,8 @@ How can we instantiate `int register_animal` without using it outside of the tem
 
 Naive attempts like
 ```cpp
+// Inside of `struct MakeAnimal<T>`:
+
 inline static int register_animal = Register();
 
 void blah()
