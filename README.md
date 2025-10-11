@@ -38,6 +38,10 @@ bundle install
 
 Run `bundle exec jekyll serve` to start a local webserver. The content autoupdates when (most?) files are modified.
 
+### Minimal sane configuration
+
+In `_config.yml`, set `url: "https://my.page.io"`. This is needed for the RSS feed to emit the correct URLs.
+
 ### Creating a post
 
 Create `YYYY-MM-DD-shortname.md` in `_posts`. The date **must** not be in the future, otherwise it will be ignored by default.

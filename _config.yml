@@ -22,7 +22,7 @@ title: Egor's blog
 description: >-
   A blog about C++ and more.
 baseurl: "" # the subpath of your site, e.g. /blog
-url: "" # the base hostname & protocol for your site, e.g. http://example.com
+url: "https://holyblackcat.github.io" # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: holyblckcat
 github_username:  holyblackcat
 
