@@ -7,6 +7,8 @@ toc: true
 
 Me and my colleague have just resolved a subtle bug that has been bothering us for months, that was caused by not using this flag. This post summarizes what we found.
 
+I'm suggesting this flag in addition to `-fvisibility=hidden`, not to replace it.
+
 Obligatory disclaimer that I don't consider myself an expert on the topic, so if I got something wrong, please tell me [here](https://github.com/HolyBlackCat/holyblackcat.github.io/issues) or elsewhere.
 
 <details><summary>TL;DR</summary>
