@@ -184,6 +184,9 @@ code {
     @include relative-font-size(0.75);
 }
 // Fix the code size in headers.
+h1 > code {
+    @include relative-font-size(1.6);
+}
 h2 > code {
     @include relative-font-size(1);
 }

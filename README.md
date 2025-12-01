@@ -66,3 +66,5 @@ title: Title
 ### Customization pointers
 
 You can paste most contents of `~/.local/share/gem/ruby/3.2.0/gems/minima-2.5.2/` into the project root to overwrite them (in particular `.html` and `.scss` files).
+
+Among other things, you can remove `| escape` from `_layouts/post.html` and `_layouts/home.html` to allow HTML in post titles (but still not markdown).
