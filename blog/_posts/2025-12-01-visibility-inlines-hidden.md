@@ -9,6 +9,8 @@ Me and my colleague have just resolved a subtle bug that has been bothering us f
 
 I'm suggesting this flag in addition to `-fvisibility=hidden`, not to replace it.
 
+CMake users can set it globally using [`CMAKE_VISIBILITY_INLINES_HIDDEN`](https://cmake.org/cmake/help/latest/variable/CMAKE_VISIBILITY_INLINES_HIDDEN.html) or for a single target using [`VISIBILITY_INLINES_HIDDEN`](https://cmake.org/cmake/help/latest/prop_tgt/VISIBILITY_INLINES_HIDDEN.html).
+
 Obligatory disclaimer that I don't consider myself an expert on the topic, so if I got something wrong, please tell me [here](https://github.com/HolyBlackCat/holyblackcat.github.io/issues) or elsewhere.
 
 <details><summary>TL;DR</summary>
@@ -147,7 +149,7 @@ On Windows (both MSVC and MinGW), the two approaches seem to be equivalent. (Exc
 
 On Linux, they are **not** equivalent. The attribute on the entire class is needed to export some additional metadata, such as the vtable, type information for `typeid`, etc. (That is, when `-fvisibility=hidden` is used.) **Forgetting the attribute on the whole class can lead to issues across shared library boundaries**, such as `dynamic_cast` failing incorrectly, or the result of `typeid(T)` comparing unequal incorrectly (when one shared library creates a class instance or uses `typeid`, and another tries to cast the instance, or compare the `std::type_info`; Clang's libc++ is especially prone to this, requiring the attribute even on `enum`s if `typeid` is applied to them).
 
-Therefore, properly written libraries, even header-only ones, will have `__attribute__((__visibility__("default)))` on every public `struct`/`class`/`union`/`enum` that they define, in case the user tries to use it across shared library boundaries. (This is on Linux. Exporting whole classes isn't needed on MSVC, as explained above.)
+Therefore, properly written libraries, even header-only ones, will have `__attribute__((__visibility__("default")))` on every public `struct`/`class`/`union`/`enum` that they define, in case the user tries to use it across shared library boundaries. (This is on Linux. Exporting whole classes isn't needed on MSVC, as explained above.)
 
 ## The bug
 
