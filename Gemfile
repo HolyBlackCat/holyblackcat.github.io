@@ -37,3 +37,5 @@ gem "http_parser.rb", "~> 0.6.0", :platforms => [:jruby]
 # Added manually to fix weird errors.
 gem "csv"
 gem "base64"
+
+gem "erb"
