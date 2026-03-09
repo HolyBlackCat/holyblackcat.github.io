@@ -7,7 +7,7 @@ toc: true
 
 ## Intro
 
-I finally got around to looking into C++20 modules, but I don't just want to throw them into a black box (called CMake) which would handle them for me, I want to understand how the build process works. So I've looked into how how different compilers handle modules, and documented it all here.
+I finally got around to looking into C++20 modules, but I don't just want to throw them into a black box (called CMake) which would handle them for me, I want to understand how the build process works. So I've looked into how different compilers handle modules, and documented it all here.
 
 This post could be useful to build system implementers, and to makefile enjoyers who want to avoid more complex build systems.
 
