@@ -161,7 +161,7 @@ The kinds of module units are:
 
    `module A;` implicitly does `import A;` (to import the primary interface unit), and it's an error to add your own redundant `import A;`.
 
-   Depending on how clever your build system and compiler are, they I believe they may be able to avoid rebuilding dependent TUs even if you **don't** move definitions to implementation units, if the module interface unit is modified in a way that e.g. only changes the function bodies and not their parameters and return types. At the time of writing, no compiler seems to support this.
+   Depending on how clever your build system and compiler are, I believe they may be able to avoid rebuilding dependent TUs even if you **don't** move definitions to implementation units, if the module interface unit is modified in a way that e.g. only changes the function bodies and not their parameters and return types. At the time of writing, no compiler seems to support this.
 
    Moving the definitions to an implementation unit makes this optimization guaranteed (i.e. the fact that importers of this module won't be rebuilt when the implementation changes; as was the case with moving function definitions from headers into `.cpp` files). And this is more parallelizable, since we don't have to wait for the interface unit to be rebuilt to check if it changed or not.
 
