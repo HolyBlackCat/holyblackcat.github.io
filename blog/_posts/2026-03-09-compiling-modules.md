@@ -319,6 +319,8 @@ Don't strictly need `/nologo /EHsc`.
 
 MSVC doesn't understand the `.cppm` extension by default, I'm using `/TP` to force it to assume the input is C++ code. You can omit this for `.cpp` files if you want.
 
+The minimal working command is `cl a.cppm /TP /scanDependencies- /std:c++20`.
+
 ### Reported target filenames
 
 In the examples above, you can use the `a.mtgt` and `a.htgt` to carry arbitrary information to the resulting module deps files and headers deps files respectively.
