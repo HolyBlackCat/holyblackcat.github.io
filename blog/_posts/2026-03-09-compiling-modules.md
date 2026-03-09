@@ -678,7 +678,7 @@ void foo() {...}
 
 Everything starting from `module :private;` is called the **"private module fragment"**.
 
-The global module fragment can only be used in the primary interface unit. If it's present, this named module must contain only one module unit (this primary interface unit).
+The private module fragment can only be used in the primary interface unit. If it's present, this named module must contain only one module unit (this primary interface unit).
 
 In theory, it just guarantees that the contents don't affect the importers and are not present in the BMI, as if it was moved to an implementation unit.
 
