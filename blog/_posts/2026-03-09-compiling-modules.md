@@ -203,7 +203,7 @@ The kinds of module units are:
 
    ```cpp
    // a.cppm
-   module A;
+   export module A;
 
    export void foo();
    ```
