@@ -393,7 +393,7 @@ There is also `-fprebuilt-module-path=...` to search BMIs in a directory, but th
 
 ### GCC
 
-GCC treats and `.cpp` and `.cppm` the same way.
+GCC treats `.cpp` and `.cppm` the same way.
 
 GCC needs `-fmodules` to export or import modules.
 
