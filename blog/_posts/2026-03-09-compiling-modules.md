@@ -45,7 +45,7 @@ MSVC|IFC (stands for "interface"?)|`.icf` (stands for "interface"?)
 
 Unlike headers, modules don't leak macros: importing a module doesn't give you its macros, and the imported module isn't affected by the macros you have already defined.
 
-In addition to a BMI, compiling a module also produces an object file (`.o`), which should be linked into the final executable. (If the module doesn't contain function definitions and such, then forgetting to link the `.o` doesn't error.)
+In addition to a BMI, compiling a module also produces an object file (`.o`), which should be linked into the final executable. (If the module doesn't contain function definitions and such, then forgetting to link the `.o` doesn't seem to error.)
 
 ## A simple example
 
