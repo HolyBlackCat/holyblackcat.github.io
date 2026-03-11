@@ -41,7 +41,7 @@ Compiler|Name|Default extension
 ---|---|---
 Clang|BMI (built module interface)|`.pcm` (precompiled module)
 GCC|CMI (compiled module interface)|`.gcm` (GCC compiled module)
-MSVC|IFC (stands for "interface"?)|`.ifc` (stands for "interface"?)
+MSVC|IFC (probably stands for "**i**nter**f**a**c**e", the author himself [doesn't know anymore](https://old.reddit.com/r/cpp/comments/16ys1r2/comment/o9puzai/))|`.ifc`
 
 Unlike headers, modules don't leak macros: importing a module doesn't give you its macros, and the imported module isn't affected by the macros you have already defined.
 
