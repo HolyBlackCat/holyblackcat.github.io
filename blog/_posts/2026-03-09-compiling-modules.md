@@ -696,6 +696,41 @@ I've made a [makefile](https://github.com/HolyBlackCat/modules-makefile) that im
 
 [Header units](#header-units) are not implemented, since the compilers seem to lack the ability to scan dependencies on header units properly, at the time or writing.
 
+## Clangd
+
+Clangd seems to support C++20 modules.
+
+There are two different ways to make them work:
+
+### `--experimental-modules-support`
+
+This is the proper solution.
+
+Pass this flag to Clangd. If you're using VSC, it goes into the `Clangd: Arguments` setting.
+
+Make sure you have `compile_commands.json` that lists all your files (importantly, it must list all importable module units, including that for the `std` module if you use that).
+
+The JSON does **not** need to contain `-fmodule-file=...` (it seems to have no effect), meaning you can create the JSON before scanning the modules.
+
+Clangd handles finding all importable module units and resolving `import`s automatically. It ignores your BMIs and works correctly even before you build the BMIs.
+
+### The manual way
+
+This is a fallback solution, if `--experimental-modules-support` doesn't work for some reason.
+
+Don't pass `--experimental-modules-support`. Include `-fmodule-file=...` in your `compile_commands.json`.
+
+Build your BMIs with the exact same Clang version as the version of Clangd you're using.
+
+Clangd will consume the BMIs specified via `-fmodule-file=...` in `compile_commands.json`, meaning you have to build the BMIs first for Clangd to function.
+
+Clangd will provide stale completions if you edit an importable file but don't rebuild its BMI.
+
+Then, if you have the importing file already open, you must type something in it (don't have to save those changes) for Clangd to notice the updated imported BMIs.
+
+
+
+
 &nbsp;
 
 That's all, thanks for reading!
