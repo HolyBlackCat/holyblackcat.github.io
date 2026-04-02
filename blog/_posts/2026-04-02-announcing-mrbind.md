@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Announcing mrbind, an automatic binding generator for C++ to C, C#, and Python
+title: Announcing mrbind, an automatic C/C#/Python binding generator for C++
 tags: C++ bindings mrbind
 toc: false
 ---
