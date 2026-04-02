@@ -45,11 +45,11 @@ Then a refactoring of the Python backend is in order, but I'm not sure when I'll
 
 I considered using [SWIG](https://www.swig.org/), but decided to make a new tool, because:
 
-* We really wanted a C backend, and SWIG doesn't have one.
-
 * We didn't want to manually write interface files, which SWIG requires.
 
   Now, it's possible that we could *generate* the interface files from the data parsed by libclang, but I haven't investigated that.
+
+* We really wanted a C backend, and SWIG didn't have one when I started development. Currently it seems to have an experimental C backend.
 
 ### CppSharp
 
