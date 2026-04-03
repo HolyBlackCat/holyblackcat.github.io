@@ -55,7 +55,7 @@ I considered using [SWIG](https://www.swig.org/), but decided to make a new tool
 
 I briefly tested [CppSharp](https://github.com/mono/cppsharp), but had some issues with it:
 
-* Certain C++ constructs caused it to crash or misbehave ([1](https://github.com/mono/CppSharp/issues/1934), [2](https://github.com/mono/CppSharp/issues/1935)), and the bug report didn't get much interest. I'd either have to actively fix bugs in CppSharp to get it to work on my code, or simplity the code, neither of which I wanted to do.
+* Certain C++ constructs caused it to crash or misbehave ([1](https://github.com/mono/CppSharp/issues/1934), [2](https://github.com/mono/CppSharp/issues/1935)), and the bug report didn't get much interest. I'd either have to actively fix bugs in CppSharp to get it to work on my code, or simplify the code, neither of which I wanted to do.
 
 * I didn't like the interface that it produced. For example, raw pointers got exposed directly as `unsafe` C# pointers, as opposed to exposing them as optional references (emulated, since C# doesn't have optional references) (we assume raw pointers to semantically mean optional references).
 
