@@ -273,11 +273,11 @@ The compilers all use the same JSON-based format for outputting module scan resu
 
 ### Clang
 
-`clang-scan-deps -format=p1689 -o a.json -- clang++ a.cppm -std=c++20 -M -MP -MF a.d -MQ a.mtgt -o a.htgt`
+`clang-scan-deps -format=p1689 -o a.json -- clang++ a.cppm -std=c++20 -M -MP -MF a.d -MQ a.htgt -o a.mtgt`
 
 Writes P1689R5 module deps to `a.json`, based on `-o ...` before `--`. Omit or `-o -` to print to `stdout`.
 
-Writes header deps to `a.d`, based on `-MF ...`. Change to `-MF -` to print to `stdout` (omitting prints to `a.htgt` per `-o`).
+Writes header deps to `a.d`, based on `-MF ...`. Change to `-MF -` to print to `stdout` (omitting prints to `a.mtgt` per `-o`).
 
 `-o ...` selects the target filename reported to P1689R5.
 
@@ -287,7 +287,7 @@ The minimal working command that ignores header deps is `clang-scan-deps -format
 
 ### GCC
 
-`g++ a.cppm -std=c++20 -M -MP -fmodules -fdeps-format=p1689r5 -fdeps-file=a.json -fdeps-target=a.htgt -MQ a.mtgt -MF a.d`
+`g++ a.cppm -std=c++20 -M -MP -fmodules -fdeps-format=p1689r5 -fdeps-file=a.json -fdeps-target=a.mtgt -MQ a.htgt -MF a.d`
 
 Writes P1689R5 module deps to `a.json`, based on `-fdeps-file=...`, change to `-fdeps-file=-` to print to stdout (omitting automatically chooses the filename).
 
