@@ -197,9 +197,9 @@ The kinds of module units are:
 
    The C++ standard requires that all interface partition units are reexported from the primary interface unit (IFNDR otherwise), but seemingly nothing bad could happen if you forget, it just makes them pointless if you do so. Notice that they can reexport each other, so the primary interface unit doesn't have to do it **directly**, doing it indirectly is fine too.
 
-4. `module A:P;` is a **"module implementation unit"** like 2, and a **"module partition"** like 3, informally an **internal partition unit**.
+4. `module A:P;` is a **"module implementation unit"** like `2`, and a **"module partition"** like `3`, informally an **internal partition unit**.
 
-   Those are a bit strange, they seem to be intended to be used for internal utilities (internal to this named module), to share code between 2's (between non-partition implementation units).
+   Those are in a weird place. Their intended purpose seems to be to hold internal utilities (internal to this named module), to share code between `2`s: (between non-partition implementation units)
 
    ```cpp
    // a.cppm
@@ -233,6 +233,8 @@ The kinds of module units are:
    The partition name `P` must be unique per named module across both interface and implementation partitions.
 
    Interestingly, Clang warns when importing those in interface units, because allegedly some contents could leak to the consumers of the module.
+
+   In addition to the intended use, those also double as an alternative to `2` that doesn't implicitly import the entire `1`, therefore providing better incremental build times. But you also get a useless BMI for it (unlike `2` which don't have BMIs) (unless you detect in your build system that no BMI is needed and disable its generation, but so far only Clang [seems to support that](#clang-1)).
 
 To summarize:
 
@@ -727,6 +729,18 @@ Clangd will consume the BMIs specified via `-fmodule-file=...` in `compile_comma
 Clangd will provide stale completions if you edit an importable file but don't rebuild its BMI.
 
 Then, if you have the importing file already open, you must type something in it (don't have to save those changes) for Clangd to notice the updated imported BMIs.
+
+## Non-standard MSVC internal partition handling
+
+Adding this for completeness.
+
+MSVC has an alternative non-standard mode of handling internal partitions that activates if you **don't** pass `/internalPartition`.
+
+Then it allows `module A:P;` to coexist with `export module A:P;` (while the standard doesn't allow duplicate partition names in the same named module), and implicitly imports the latter into the former, and doesn't generate any BMI for the former.
+
+This implicit import is not reported during scanning. `/internalPartition` has no effect on scanning (which makes sense, since you need said scanning to determine if the file is an internal partition in the first place, and therefore could accept this flag).
+
+While this mode does make some sense, it's non-standard so probably should be avoided.
 
 
 
