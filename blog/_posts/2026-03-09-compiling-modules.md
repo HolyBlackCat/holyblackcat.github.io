@@ -167,7 +167,7 @@ The kinds of module units are:
 
 3. **`export module A:P;`** is a non-primary **"module interface unit"** and a **"partition unit"**, or informally a **interface partition unit**. There can be multiple of those.
 
-   The purpose of those is to split large interfaces, to avoid having everything in the primary inteface unit.
+   The purpose of those is to split large interfaces, to avoid having everything in the primary interface unit.
 
    ```cpp
    // a.cppm
@@ -191,7 +191,7 @@ The kinds of module units are:
 
    As you can see, those can be imported inside of the same named module. But not from outside (at least not directly, but you can import the primary interface unit from outside that reexports those).
 
-   `P` is a **"partition name"**. Like a module name, it's a `.`-separated list of identifiers, with `.` having no special name and just being a part of the name.
+   `P` is a **"partition name"**. Like a module name, it's a `.`-separated list of identifiers, with `.` having no special meaning and just being a part of the name.
 
    Partition names must be unique per named module.
 
@@ -259,9 +259,9 @@ To correctly handle dependencies between modules, all `.cpp`/`.cppm` need to be 
 
 The scan results for a file need to be updated when the file changes, or when any headers that it includes (maybe indirectly) are modified (because you could wrap an import in an `#ifdef` affected by an include). We **don't** need to rescan a file when the module units imported by it are modified.
 
-Then the TU needs to be rebuilt if it had to be rescanned, **or** if any of its imported module units were modified, recursively.
+Then the TU needs to be rebuilt if it had to be rescanned, **or** if any of its imported module units were modified, recursively (can get away with doint it [non-recursively](#handling-indirect-dependencies) in some cases).
 
-This means that we no longer need to emit the header dependencies as the byproduct of the compilation (unlike pre-modules), since it can be done during scanning, and is needed to correctly rescan anyway (in theory, the alternative to emitting them during scans is to emit them during compilation, but then if the subsequent compilation of a TU fails, you would have to remember to rescan it; this seems unnecessarily complicated and pointless).
+This means that we no longer need to emit the header dependencies as the byproduct of the compilation (unlike pre-modules), since it can be done during scanning, and is needed to correctly rescan anyway (in theory, the alternative to emitting them during scans is to emit them during compilation, but then if said compilation (of this TU) fails, you would have to remember to rescan it; this seems unnecessarily complicated and pointless).
 
 But if rebuilding a BMI produced a bitwise identical file (a build system should compare hashes), then TUs importing it don't have to be rebuilt. [More details later.](#non-cascading-changes)
 
@@ -531,11 +531,11 @@ GCC has `-fmodule-only` to generate a BMI without an `.o`, but it doesn't have a
 
 ## Non-cascading changes
 
-As mentioned earlier, rebuilding a BMI can produce a bitwise identical file if any of the following are true:
+As mentioned earlier, rebuilding a BMI can produce a bitwise identical file in the following cases:
 
 * The imported module units got changed in a way that doesn't affect this one, or
 
-* All changes are isolated to function bodies and such (no compiler seems to implement the latter at the time of writing).
+* All changes in the current file are isolated to function bodies and such (no compiler seems to implement this at the time of writing).
 
 For each BMI, after building it, hash it and store the hash to a file. Load the old hash first and compare them. (If this is [Clang's two-phase compilation](#two-phase-compilation) and you have both a full and a reduced BMI, hash the reduced BMI only.)
 
