@@ -98,7 +98,7 @@ In each of those, the first command both produces a BMI and an object file for t
 
 Since a BMI is faster to produce than an object file, compilers can employ various tricks to inform the build systems when the BMI is ready, so that it can be consumed (by a parallel compilation command) without waiting for the object. More on that later too.
 
-There seems to be no single convention for what the source file extension should be. I'm using the Clang's convention of `.cppm`. Since MSVC doesn't understand this extension, I'm using `/TP` to tell it that it's a C++ source file.
+There seems to be no single convention for what the source file extension should be. I'm using the Clang's convention of `.cppm`. Since MSVC doesn't understand this extension, I'm using `/TP` to tell it that it's a C++ source file. ([See below](#file-naming-conventions) for different naming conventions.)
 
 `A` is the module name. Module names are `.`-separated lists of identifiers, so `A.B` or `A.B.C` would also be valid names. `.` has no special meaning and is just a part of the name.
 
@@ -249,11 +249,23 @@ no `:Partition`|(1) primary interface unit|(2) implementation unit
 
 * `1`, `3`, `4` (but not `2`) are **importable units**, though only `1` can be imported outside of its named module.
 
-Clang's convention is to use `.cppm` for importable units and `.cpp` for non-importable ones.
-
 Depending on the context, a "module" seems to mean either a "named module" or an "importable module unit" or a "module unit".
 
 The intent seems to be to have a relatively small amount of named modules in a project. In large projects, the source files naturally tend to get separated into subdirectories, and each of those subdirectories is a good candidate for being a single named module. Small projects could consist entirely of a single named module.
+
+## File naming conventions
+
+Unit kind | Clang | GCC | MSVC
+---|---|---|---
+(1) primary interface|`.cppm`|any|`.ixx`
+(2) implementation|`.cpp`|any|`.cpp` (must never be `.ixx`)
+(3) interface partition|`.cppm`|any|`.ixx`
+(4) internal partition|`.cppm`|any|`.cpp` (must never be `.ixx`)
+regular file|`.cpp`|`.cpp`|`.cpp`
+
+Different compilers prefer different extensions for different kinds of module units, but all of them can handle any extension by adding appropriate flags, as explained later (with the exception of MSVC, which [can't tolerate some extensions](#msvc-1))
+
+This tutorial follows Clang's convention.
 
 ## The build procedure for modules
 
@@ -379,6 +391,8 @@ I'm told that GCC is able to report in real-time when the BMI is done (it can co
 
 Clang treats `.cppm` and `.cpp` differently, as importable module units and as non-importable/non-module units respectively. This can be overridden using `-xc++-module` or `-xc++` before the source filename respectively. Trying to compile an importable module unit as `.cpp`/`-xc++` doesn't error, but produces no BMI. Trying to compile a non-importable module unit or a non-module as a `.cppm`/`-xc++-module` errors.
 
+Clang doesn't understand the `.ixx` extension at all, you must use `-xc++-module` or `-xc++` before one.
+
 Example compilation command for an importable unit:
 ```sh
 clang++ a.cppm -std=c++20 -fmodules-reduced-bmi -c -o a.o -fmodule-output=a.pcm
@@ -395,7 +409,7 @@ There is also `-fprebuilt-module-path=...` to search BMIs in a directory, but th
 
 ### GCC
 
-GCC treats `.cpp` and `.cppm` the same way.
+GCC treats `.cpp`, `.cppm`, `.ixx` all in the same way.
 
 GCC needs `-fmodules` to export or import modules.
 
@@ -420,13 +434,25 @@ GCC can also [interact with programs over sockets or otherwise](https://gcc.gnu.
 
 ### MSVC
 
-MSVC doesn't care about file extensions for importable vs non-importable units, like GCC.
+MSVC prefers `.ixx` for interface units (unlike Clang's `.cppm` this excludes internal partitions) and `.cpp` for other files. If an interface file has extension other than `.ixx`, you must add the `/interface` flag (not doing so is a compilation error).
 
-But MSVC doesn't understand the `.cppm` extension, so if you use that, you need `/TP` to force treat it as C++.
+Internal partitions need the `/internalPartition` flag (otherwise they're handled in a [non-standard manner](#non-standard-msvc-internal-partition-handling)).
+
+MSVC doesn't understand the `.cppm` extension, so if you use that, you need `/TP` to force treat it as C++ (**in addition** to `/interface` or `/internalPartition` if needed).
+
+MSVC absolutely doesn't tolerate the `.ixx` extension on non-interface module units, so a good build system must complain about it. On non-module units it's fine.
+
+<details><summary>(Click for more detailed observations on how <code>/interface</code>/<code>/internalPartition</code>/<code>.ifc</code> behave when misused.)</summary>
+
+Using `.ixx` with `/internalParition` is an error. Using `.ixx` on an implementation unit warns and treats it as a primary interface (even produces a BMI!). Using `.ixx` on a non-module unit does nothing. Using `.ixx` on an internal partition without `/internalPartition` does *something* (produces a possibly broken BMI, in addition to exhibiting the [usual non-standard implicit import](#non-standard-msvc-internal-partition-handling)).
+
+Incorrectly adding `/internalParition` similarly tends to misbehave: For interface partitions it produces a possibly broken BMI. For primary interfaces it tries to import the same primary interface (as if we were in an implementation unit), but then also produces some sort of a BMI. It does nothing on non-module units.
+
+—
+
+</details>
 
 The standard needs to be set to `/std:c++20` or newer.
-
-MSVC needs different flags for different kinds of importable units: interface units need `/interface`, and internal partitions need `/internalPartition`.
 
 `/Fo...` sets the object output path, and `/ifcOutput...` sets the BMI output path.
 
