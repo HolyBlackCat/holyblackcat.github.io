@@ -27,7 +27,7 @@ Each `.cpp` file is compiled independently (possibly in parallel). As a byproduc
 
 Then on a rebuild, you check the modification times of the headers from that list, and if any of the headers were modified, you recompile the respective the `.cpp` file.
 
-To get the list of headers, you use `-MD -MP` on GCC and Clang (or `-MMD -MP` to skip system headers), and `/sourceDependencies output.json` on MSVC.
+To get the list of headers, you use `-MD -MP` on GCC and Clang (or `-MMD -MP` to skip system headers), and `/sourceDependencies output.json` on MSVC. (Alternatively, MSVC has `/showIncludes`, which some older build systems use. It prints included headers to stdout alongside the diagnostics in a locale-dependent format, which requires build systems to filter the output.)
 
 ## What are C++20 modules
 
