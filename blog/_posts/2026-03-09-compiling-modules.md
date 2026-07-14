@@ -273,7 +273,7 @@ To correctly handle dependencies between modules, all `.cpp`/`.cppm` need to be 
 
 The scan results for a file need to be updated when the file changes, or when any headers that it includes (maybe indirectly) are modified (because you could wrap an import in an `#ifdef` affected by an include). We **don't** need to rescan a file when the module units imported by it are modified.
 
-Then the TU needs to be rebuilt if it had to be rescanned, **or** if any of its imported module units were modified, recursively (can get away with doint it [non-recursively](#handling-indirect-dependencies) in some cases).
+Then the TU needs to be rebuilt if it had to be rescanned, **or** if any of its imported module units were modified, recursively (can get away with doing it [non-recursively](#handling-indirect-dependencies) in some cases).
 
 This means that we no longer need to emit the header dependencies as the byproduct of the compilation (unlike pre-modules), since it can be done during scanning, and is needed to correctly rescan anyway (in theory, the alternative to emitting them during scans is to emit them during compilation, but then if said compilation (of this TU) fails, you would have to remember to rescan it; this seems unnecessarily complicated and pointless).
 
@@ -377,7 +377,7 @@ When partitions are involed, `:...` is just appended to the name string, so part
 
 The implicit `import A;` in files starting with `export A;` is implicitly added to `requires`.
 
-Notice that `"requires": [...]` can't differentiate between `import`s and `export import`s, but this very useful to a build system (at best it could probably enable some small build optimizations on MSVC, more on that later).
+Notice that `"requires": [...]` can't differentiate between `import`s and `export import`s, but this isn't very useful to a build system (at best it could probably enable some small build optimizations on MSVC, more on that later).
 
 ## Single-phase compilation
 
@@ -385,7 +385,7 @@ All three compilers can do this, and this is the simplest approach.
 
 "Single phase" refers to the BMI and the `.o` being produced by the same compiler invocation. (Some sources count the scan as another phase, which adds to the confusion, since for Clang ["two-phase compilation"](#two-phase-compilation) means something else.)
 
-I'm told that GCC is able to report in real-time when the BMI is done (it can communicate so [over sockets or otherwise](https://gcc.gnu.org/onlinedocs/gcc/C_002b_002b-Module-Mapper.html)), but implementing this into a build system sounds like too much effort, so I'm going to ignore it in this tutorial.
+I'm told that GCC is able to report in real-time when the BMI is done (which can happen before `.o` is done) (it can communicate so [over sockets or otherwise](https://gcc.gnu.org/onlinedocs/gcc/C_002b_002b-Module-Mapper.html)), but implementing this into a build system sounds like too much effort, so I'm going to ignore it in this tutorial.
 
 ### Clang
 
