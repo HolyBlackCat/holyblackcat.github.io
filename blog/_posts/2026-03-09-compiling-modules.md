@@ -263,7 +263,9 @@ Unit kind | Clang | GCC | MSVC
 (4) internal partition|`.cppm`|any|`.cpp` (must never be `.ixx`)
 regular file|`.cpp`|`.cpp`|`.cpp`
 
-Different compilers prefer different extensions for different kinds of module units, but all of them can handle any extension by adding appropriate flags, as explained later (with the exception of MSVC, which [can't tolerate some extensions](#msvc-1))
+Those are only conventions, you're free to name your files whatever (with [some limitations on MSVC](#msvc-1), as explained in the table).
+
+Compilers need some extra flags if you don't follow their conventions, but it seems best to always pass those flags to not have to worry about the extensions (and have the build validate the extensions if desired).
 
 This tutorial follows Clang's convention.
 
@@ -434,7 +436,7 @@ GCC can also [interact with programs over sockets or otherwise](https://gcc.gnu.
 
 ### MSVC
 
-MSVC prefers `.ixx` for interface units (unlike Clang's `.cppm` this excludes internal partitions) and `.cpp` for other files. If an interface file has extension other than `.ixx`, you must add the `/interface` flag (not doing so is a compilation error).
+MSVC's convention is to use `.ixx` for interface units (unlike Clang's `.cppm` this excludes internal partitions) and `.cpp` for other files. If an interface file has extension other than `.ixx`, you must add the `/interface` flag (not doing so is a compilation error).
 
 Internal partitions need the `/internalPartition` flag (otherwise they're handled in a [non-standard manner](#non-standard-msvc-internal-partition-handling)).
 
@@ -480,7 +482,7 @@ Category|Clang|GCC|MSVC|Comment
 ---|---|---|---|---
 Language standard|`-std=c++20` or newer|Any standard + `-fmodules`|`/std:c++20` or newer
 Other flags|`-c`<br/>+ `-fmodules-reduced-bmi` to use a nicer BMI format (default since Clang 22)|`-c`|`/c`<br/>+ `/nologo /EHsc` recommended out of general sanity|Each compiler needs it's usual `-c`/`/c` flag.
-A module map?|No.<br/>(Clang uses some sort of module maps for their [non-standard pre-C++20 modules](https://clang.llvm.org/docs/Modules.html#module-maps). They say that they can have some use for C++20 [header units](#header-units) ([source](https://clang.llvm.org/docs/StandardCPlusPlusModules.html#using-clang-module-map-to-avoid-mixing-include-and-import-problems)) but I didn't look into it.)|[`-fmodule-mapper=...`](#gcc-1)<br/>Needed to support custom BMI paths.|`/ifcMap...`<br/>Optional, can be used instead of passing `/reference` for every imported module.|I recommend using a module map at least in GCC to customize the BMI paths.<br/>Optionally in MSVC to avoid dealing with `/reference`, but the same logic is needed for Clang anyway.
+A module map?|No.<br/><br/>(Clang uses module maps for their non-standard pre-C++20 modules, they could have some limited uses for [C++20 header modules](#clang-2).)|[`-fmodule-mapper=...`](#gcc-1)<br/>Needed to support custom BMI paths.|`/ifcMap...`<br/>Optional, can be used instead of passing `/reference` for every imported module.|I recommend using a module map at least in GCC to customize the BMI paths.<br/>Optionally in MSVC to avoid dealing with `/reference`, but the same logic is needed for Clang anyway.
 Choosing the output object filename|`-o ...`|`-o ...`|`/Fo...` (without a space)
 Choosing the output BMI filename|`-fmodule-output=...`<br/>(Not setting this uses the object filename with the extension changed to `.pcm`.)|Taken from the module map.<br/>Or chosen automatically as `./gcm.cache/...` if no module map.|`/ifcOutput...`<br/>Or created in the current directory using the module name.|The filenames automatically selected by MSVC work with its implicit search for BMIs in the current directory.<br/>But the filenames automatically chosen by Clang don't work with its `-fprebuilt-module-path=...`, as they are based on the object filenames, not on the module names.
 Need to list imported BMI paths? |Yes, `-fmodule-file=NAME=PATH`. (Omitting `NAME=` is deprecated.)<br/>Can also search in directories using `-fprebuilt-module-path=...`, but that requires choosing the right BMI filenames in the build system, Clang doesn't automate this.|No. The module map is used if provided, otherwise the default path `./gcm.cache` is searched for BMIs.|`/reference NAME=PATH`<br/>Or using the module map.<br/>Additionally always searches for BMIs in `.` regardless of anything else.|When listing BMIs using flags, must list indirect dependencies too.
@@ -630,17 +632,61 @@ Since the BMIs depend on the compiler and its settings, the build system must bu
 
 The main issue is locating the sources for those modules. The procedure depends both on the compiler and on the chosen C++ standard library.
 
-* **GCC**: `g++ -print-file-name=libstdc++.modules.json`. This prints a path to a JSON, which in turn lists the paths to the two source files, `std.cc` and `std.compat.cc`, relative to the JSON itself.
+### Minimal examples
 
-  In theory GCC can also work with libc++ instead of libstdc++, but this isn't a popular configuration. I hope if this is enabled at GCC build time, `g++ -print-file-name=libc++.modules.json` should just work, possibly with `-stdlib=libc++`.
+Those are intended to quickly test `import std;`, not to serve as inspiration for build systems. [See below](#proper-procedure) for the proper procedure.
 
-  Another option for GCC is not locating the file at all, and compiling it using `g++ -fsearch-include-path bits/std.cc ....` and similarly for `std.compat`. The flag `-fsearch-include-path` tells it to search for the specified source files in include directories.
+* **GCC:** `g++ 1.cpp -fmodules -std=c++23 --compile-std-module`
+
+  This recompiles both `std` and your file every time, which can be slow. To avoid that, build `std` in a separate step:
+  ```sh
+  g++ -fmodules -std=c++23 --compile-std-module -c
+  g++ -fmodules -std=c++23 1.cpp
+  ```
+
+  Serious build systems probably shouldn't use `--compile-std-module`, [see below](#proper-procedure).
+
+* **Clang:**
+
+  * With `libstdc++` or `libc++`:
+    ```sh
+    # This is a bash script. It calls `jq` to process JSON, make sure you have `jq` installed.
+    MODULE_STD_SRC="$(dirname "$(clang++ -print-library-module-manifest-path)")/$(jq -r '.modules[] | select(."logical-name" == "std") | ."source-path"' "$(clang++ -print-library-module-manifest-path)")
+    clang++ -std=c++23 -xc++-module -Wno-reserved-module-identifier "$MODULE_STD_SRC" -c
+    clang++ -std=c++23 1.cpp -fmodule-file=std=std.pcm
+    ```
+    If you want to pass `-stdlib=libstdc++`/`-stdlib=libc++`, it has to be passed into each of the `clang++ ...` commands above.
+
+  * With MSVC STL:
+    ```ps
+    # This is a powershell script.
+    $MODULE_STD_DIR = clang++ -std=c++23 -xc++ -xc++-system-header yvals.h -M | Select -first 2 | Select -last 1 | %{$_ -replace '^ *','' -replace '\\include\\yvals\.h \\$','\modules' -replace '\\ ',' ' }
+    clang++ -std=c++23 -xc++-module -Wno-reserved-module-identifier  -Wno-include-angled-in-module-purview "$MODULE_STD_DIR/std.ixx" -c
+    clang++ -std=c++23 1.cpp -fmodule-file=std="std.pcm"
+    ```
+* **MSVC:**
+
+  ```ps
+  # This is a powershell script. If running in VS Developer Command Prompt, type `powershell` first to enter powershell.
+  echo '#include <yvals.h>' >_test.cpp
+  $MODULE_STD_DIR = (cl /nologo /EHsc /std:c++latest _test.cpp /Zs /sourceDependencies- | select -skip 1 | ConvertFrom-Json).Data.Includes[0] -replace '\\include\\yvals\.h','\modules'
+  cl /nologo /EHsc /std:c++latest "$MODULE_STD_DIR/std.ixx" /c
+  cl /nologo /EHsc /std:c++latest 1.cpp
+  ```
+
+### Proper procedure
+
+* **GCC**: `g++ -print-file-name=libstdc++.modules.json`. This prints a path to a JSON, which in turn lists the paths to the two source files, `std.cc` and `std.compat.cc`, relative to the directory containing the JSON itself. (Some GCC distributions may ship manifests with broken paths. Your build system should expose a way to pass a custom path.)
+
+  In theory GCC can also work with libc++ instead of libstdc++, but this isn't a popular configuration. I hope if this is enabled at GCC build time, then `g++ -print-file-name=libc++.modules.json` should just work, possibly with `-stdlib=libc++`.
+
+  Another option for GCC is not locating the file at all, and compiling it using `g++ -fsearch-include-path bits/std.cc ....` and similarly for `std.compat`. The flag `-fsearch-include-path` tells it to search for the specified source files in include directories. Yet another option (since GCC 16) is `g++ --compile-std-module` which compiles `std`, `std.compat`, and `bits/stdc++.h` (as a [header module](#header-units)) all in one command.
 
 * **Clang**: For libstdc++ and libc++: `clang++ -print-library-module-manifest-path`. Same style of JSON as GCC. This respects `-stdlib=libstdc++` vs `-stdlib=libc++`, and outputs the correct JSON for each.
 
   Clang also understands the GCC-style `-print-file-name=libstdc++.modules.json`, and for libc++ `-print-file-name=libstdc++.modules.json`. But this seems worse than `-print-library-module-manifest-path`, since now you have to manually specify which standard library to use.
 
-  Clang't doesn't understand GCC's `-fsearch-include-path`.
+  Clang doesn't understand GCC's `-fsearch-include-path` or `--compile-std-module`.
 
   The flag `-print-library-module-manifest-path` doesn't work with MSVC STL. For MSVC STL it will print `<NOT PRESENT>`. I couldn't find a proper procedure for MSVC STL, but this hack seems to work:
 
@@ -662,7 +708,7 @@ The main issue is locating the sources for those modules. The procedure depends 
 
   Another search approach seems to be to look relative to the location of `cl.exe`, which can be e.g. `C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\bin\Hostx64\x64\cl.exe`. But this doens't work in [msvc-wine](https://github.com/mstorsjo/msvc-wine), so I prefer the previous option.
 
-Then scan and compile those modules as usual, except Clang needs `-Wno-reserved-module-identifier` to silence the warning about the module names being reserved for the standard library.
+Then scan and compile those modules as usual, except Clang needs `-Wno-reserved-module-identifier` to silence the warning about the module names being reserved for the standard library, plus on MSVC STL it needs `-Wno-include-angled-in-module-purview`.
 
 You could even skip scanning those files, as it seems that `std.compat` always imports `std`, and they don't import anything else.
 
