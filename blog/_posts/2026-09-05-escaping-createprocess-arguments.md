@@ -87,13 +87,13 @@ There are `CreateProcess()`, `CreateProcessA()`, and `CreateProcessW()`. You wan
 
 Like many other WinAPI functions, `CreateProcess()` has two versions: `CreateProcessW()` that uses UTF-16 and `CreateProcessA()` that uses the currently active code page (so a narrow string, but usually not UTF-8). `CreateProcess()` is a macro that's defined to one or the other (depending on `#define UNICODE`, but that doesn't matter).
 
-`CreateProcessA()` is basically unusable for anything serious, becauase it can't deal with unicode, and can only handle a very limited set of symbols from the active code page. In theory you can set the active code page to UTF-8, but if you're a library, asking the users to do that isn't nice.
+`CreateProcessA()` is basically unusable for anything serious, because it can't deal with unicode, and can only handle a very limited set of symbols from the active code page. In theory you can set the active code page to UTF-8, but if you're a library, asking the users to do that isn't nice.
 
 `CreateProcess()` (without `A`/`W`) and `#define UNICODE` are even more useless.
 
 Since the UTF-16 is what's actually used under the hood, you want to use the UTF-16 version, `CreateProcessW()`. If your strings are UTF-8 (as they should be), convert them to UTF-16 using [`MultiByteToWideChar()`](https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-multibytetowidechar) or some other method.
 
-Also consider using [WTF-8](https://wtf-8.codeberg.page) instead of UTF-8 to store the original strings. Some invalid UTF-16 strings (that can nontheless appear in file paths) are impossible to represent as UTF-8, but you can trivially extend it to fix it (which is what WTF-8 is).
+Also consider using [WTF-8](https://wtf-8.codeberg.page) instead of UTF-8 to store the original strings. Some invalid UTF-16 strings (that can nonetheless appear in file paths) are impossible to represent as UTF-8, but you can trivially extend it to fix it (which is what WTF-8 is).
 
 ### Arguments of `CreateProcess()`
 
@@ -108,11 +108,9 @@ The function (specifically the `CreateProcessW()` version) can modify the second
 
 If `lpApplicationName` isn't null, it's used instead of the first part of `lpCommandLine` as the executable path. But the first part of `lpCommandLine` still ends up passed to `argv[0]` of the new process, which by convention should match the executable path. So this is exactly the same as what POSIX does: `argv[0]` usually matches the executable name, but is not required to.
 
-But `lpApplicationName` uses a different search mechanism: unlike `lpCommandLine` it doesn't respect `PATH` and doesn't allow the `.exe` extension to be omitted. If the path is relative, it searches relative to the current directory (which `lpCommandLine` does too, unlike on POSIX). If `lpApplicationName` starts with a slash, it searches on the current drive letter, so usually `\foo\bar.exe` -> `C:\foo\bar.exe`.
+But `lpApplicationName` uses a different search mechanism: unlike `lpCommandLine` it doesn't respect `PATH` and doesn't allow the `.exe` extension to be omitted. If the path is relative, it searches relative to the current directory (which `lpCommandLine` does too, unlike on POSIX). If `lpApplicationName` starts with `\`, it searches on the current drive letter, so usually `\foo\bar.exe` -> `C:\foo\bar.exe`.
 
 If `lpApplicationName` isn't null but `lpCommandLine` is null, it normally just becomes the quoted version of `lpApplicationName` (so `lpApplicationName` gets passed to `argv[0]`; but also check out [this fun bug](#trailing-garbage-in-executable-name)).
-
-Interestingly, empty `argv` is a no-op on POSIX. But an empty `lpCommandLine` on Windows is an error.
 
 So, in short: to get sane behavior, you usually don't want to pass `lpApplicationName`, only pass `lpCommandLine`.
 
@@ -132,7 +130,7 @@ For example, `foo"bar"` can be escaped as either `foo\"bar\"` or `"foo""bar"""`.
 
 In most cases there seems to be no difference between `""` and `\"`, but for [batch files](#batch-files) only `""` works correctly, so it's easier to always use `""` instead of `\"`. [More on that below.](#basic-batch-escaping)
 
-Existing `\` must be escaped as `\\` **ONLY IF** it is followed by 0 or more `\` and then a `"` (if you quoted the whole argument, your own trailing quote does count for this). In other words, if you encounter one or more `\` followed by a quote, you output twice as many `\`, and then the escaped quote as usual (or not escaped if its your own closing quote at the end of argument).
+Existing `\` must be escaped as `\\` **ONLY IF** it is followed by 0 or more `\` and then a `"` (if you quoted the whole argument, your own trailing quote does count for this). In other words, if you encounter one or more `\` followed by a quote, you output twice as many `\`, and then the escaped quote as usual (or not escaped if it's your own closing quote at the end of argument).
 
 Some examples:
 
@@ -178,7 +176,7 @@ Imagine you're writing a shell script that calls another program and forwards `a
   my_program %*
   ```
 
-The Bash version propagates the arguments literally, as is. Despire how the quotes make it look, it will correctly pass multiple arguments as separate arguments.
+The Bash version propagates the arguments literally, as is. Despite how the quotes make it look, it will correctly pass multiple arguments as separate arguments.
 
 The CMD version will not only expand env variables in the arguments, **it will also run arbitrary commands for you**. Try running `foo.bat &calc.exe`, and `my_program %*` will expand to `my_program &calc.exe`, with `&` being interpreted as a command separator. That will run `calc.exe`.
 
@@ -202,7 +200,7 @@ Batch has two escaping mechanisms:
 
    Notably `\"` doesn't work in batch quotes. It's considered to end the string. It means two things:
 
-   * Running the batch file as `foo.bat "foo\" &calc.exe"` is going to run `calc.exe`, because the quotes only escape the `"foo\"` part).
+   * Running the batch file as `foo.bat "foo\" &calc.exe"` is going to run `calc.exe`, because the quotes only escape the `"foo\"` part.
 
    * It **also** prevents the arguments from splitting correctly. Batch provides `%1`, `%2`, etc, to access its `argv[i]`, and it must be using some custom splitting logic (or an older version of the C runtime?), because `"foo\" bar"` is treated as two arguments, not one. This only matters when using `%1`, `%2`, and not for `%*`, since that just expands to one long string, and doesn't care about batch argument splitting logic.
 
@@ -230,7 +228,7 @@ The fun continues!
 
 2. And conversely, **quotes disable `^`** (if the quotes themselves are not escaped with `^`).
 
-   Quoted `^` are preserved literally. So `foo.bat "^&calc.exe"'` is safe but passes the wrong string (`^&calc.exe` instead of `&calc.exe`).
+   Quoted `^` are preserved literally. So `foo.bat "^&calc.exe"` is safe but passes the wrong string (`^&calc.exe` instead of `&calc.exe`).
 
    `^"^&calc.exe^"` is safe, but it's no different than `"&calc.exe"`. It literally becomes that after the first expansion, and the second expansion sees `"&calc.exe"`.
 
@@ -276,7 +274,7 @@ As mentioned [before](#basic-batch-escaping), it's impossible to prevent `%FOO%`
 
 We can't just ignore this, because you can run arbitrary commands with those, even without needing custom env variables.
 
-[BatBadBut](https://flatt.tech/research/posts/batbadbut-you-cant-securely-execute-commands-on-windows/) shows the following trick: `foo.bat "%CMDCMDLINE:~-1%&calc.exe"`. This runs `calc.exe` despite being quoted. The `CMDCMDLINE` variable returns the `argv` of the process running the script, so it's literally the same command. The `%  :~-1%` part extracts the last character from it, which is a `"`, which lets this break out from the exising quotes to allows `&` to work. (While you can add whitespace to the end of the command to work around this specific argument, the attacker can then change the substring offset to the new position of the quote.)
+[BatBadBut](https://flatt.tech/research/posts/batbadbut-you-cant-securely-execute-commands-on-windows/) shows the following trick: `foo.bat "%CMDCMDLINE:~-1%&calc.exe"`. This runs `calc.exe` despite being quoted. The `CMDCMDLINE` variable returns the `argv` of the process running the script, so it's literally the same command. The `%  :~-1%` part extracts the last character from it, which is a `"`, which lets this break out from the existing quotes to allow `&` to work. (While you can add whitespace to the end of the command to work around this specific argument, the attacker can then change the substring offset to the new position of the quote.)
 
 The same article suggests a clever escaping method for `%`: `%%cd:~,%`. This produces a single `%`.
 
@@ -306,7 +304,7 @@ Delayed expansion is off by default, but can be enabled with a registry key (or 
 
 Since customizing those registry keys is evil, and passing `!` might be useful, I think force prepending `cmd /d /e:on /v:off /c ` to batch files is a good idea. Alternatively we'd have to ban `!` in arguments, like `%`.
 
-Before you ask, `!!cd:~,!` doesn't seem to work. `'cmd /d /v:on "/e:on" /c foo.bat "!!cd:~,!PATH!!cd:~,!"` does print the expanded `PATH`.
+Before you ask, `!!cd:~,!` doesn't seem to work. `cmd /d /v:on "/e:on" /c foo.bat "!!cd:~,!PATH!!cd:~,!"` does print the expanded `PATH`.
 
 ### What characters need to be banned in batch arguments?
 
@@ -314,7 +312,7 @@ In addition to `%` (and optionally `!` if you don't want to prepend `cmd ... /v:
 
 * `\n` (line break) in batch arguments - it silently deletes itself and everything after in the command line.
 
-* `\r` (carriage return) in batch arguments - it's silently deletes itself.
+* `\r` (carriage return) in batch arguments - it silently deletes itself.
 
 `\n`,`\r` don't seem to be harmful, just weird. Since there's no valid reason to pass them, I'd error on them.
 
@@ -381,18 +379,18 @@ The inputs are: an optional string `executable`, and an optional array of string
    * If `argv` is specified, it can't be empty.
 
 2. Let `exe_name` be `executable` if specified, or `argv[0]` otherwise.<br/>
-   (`exe_step` is a reference. If the steps below say to modify it, update its source too.)
+   (`exe_name` is a reference. If the steps below say to modify it, update its source too.)
 
 3. Error if `exe_name` ends with ` ` space or `.` dot. [(details)](#trailing-garbage-in-executable-name)<br/>
    Or alternatively remove any trailing spaces and dots from it yourself (could be more than one).
 
-4. Check if we're dealing with a batch file: check if `exe_name` ends with `.exe` or `.cmd` (both case-insensitive), or equals `cmd` or `cmd.exe` (again case-insensitive). [(details)](#how-to-check-if-its-a-batch-file)
+4. Check if we're dealing with a batch file: check if `exe_name` ends with `.bat` or `.cmd` (both case-insensitive), or equals `cmd` or `cmd.exe` (again case-insensitive). [(details)](#how-to-check-if-its-a-batch-file)
 
 5. If this is batch, perform additional argument validation. Error if `executable` or any element of `argv` (including `0`th) contains any of: `%`, `\n` (line break), `\r` (carriage return). [(details)](#what-characters-need-to-be-banned-in-batch-arguments)
 
     You can allow `%`, but it's potentially unsafe. If you do, then you should quote it as explained in the next steps. [(details)](#escaping-)
 
-6. If this is batch, add some arguments to the beginning of `argv`: `/d`,`/e:on`,`/v:off`,`/c`. Then add the value of `exe_path` (if it wasn't equal to `cmd` or `cmd.exe` on step 4). Lastly, replace `exe_path` with string `cmd`. [(details)](#escaping--1)
+6. If this is batch, add some arguments to the beginning of `argv`: `cmd`,`/d`,`/e:on`,`/v:off`,`/c`. Then add the value of `exe_name` (if it wasn't equal to `cmd` or `cmd.exe` on step 4). Lastly, replace `exe_name` with string `cmd`. [(details)](#escaping--1)
 
     Step 6 is not strictly necessary, but if you don't do it, then you should also reject `!` (and `%`) earlier on step 5.
 
@@ -431,7 +429,7 @@ Relaxed|Yes|Yes<br/>(escaped)|Yes|Can be unsafe on some batch files.
 Keep registry settings|No|No|No|Safe, but the user messing with registry keys can affect your batch files.
 Unsafe|No|Yes (not escaped)|Yes|Unsafe.
 
-This could be exposed as a enum, or perhaps two bools (`keep_registry_settings` and `unsafe`).
+This could be exposed as an enum, or perhaps two bools (`keep_registry_settings` and `unsafe`).
 
 &nbsp;
 
