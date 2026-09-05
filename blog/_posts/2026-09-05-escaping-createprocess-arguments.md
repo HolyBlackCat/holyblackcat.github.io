@@ -446,7 +446,7 @@ The inputs are: an optional string `executable`, and an optional array of string
 
             * If it's the `0`th element, always quote. [(details)](#quoting-the-executable-name)
 
-            * Quote if the element contains any of: <code> </code> spaces, `\t` tabs, `"` quotes. If this is batch, also check for ``<>&|()[]{}^=;!'+,`~``. [(details)](#what-characters-need-to-be-quoted-in-batch-arguments)
+            * Quote if the element contains any of: <code> </code> spaces, `\t` tabs, `"` quotes. If this is batch-or-cmd, also check for ``<>&|()[]{}^=;!'+,`~``. [(details)](#what-characters-need-to-be-quoted-in-batch-arguments)
 
         * Write opening quote `"` if we're quoting this element.
 
@@ -474,7 +474,7 @@ The inputs are: an optional string `executable`, and an optional array of string
 
             Then immediately write <code> "</code> (space and a quote), and then skip writing <code> </code> separator on the next iteration.
 
-    3. Write closing `"` If the whole command needs to be quoted per step 9, or if you handled `/c` as explained earlier. [(details)](#special-quoting-rules-of-cmd-c)
+    3. Write closing `"` If the whole command needs to be quoted per step 8, or if you handled `/c` as explained earlier. [(details)](#special-quoting-rules-of-cmd-c)
 
 As you can see, this has some knobs for batch files. I'd suggest exposing the following modes as a setting:
 
