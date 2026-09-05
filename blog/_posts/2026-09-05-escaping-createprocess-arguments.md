@@ -120,7 +120,7 @@ This method is sufficient if you're running an executable and [not a batch file]
 
 `lpCommandLine` is a space-separated list of arguments, the first of which is the program name.
 
-If an argument (or the program name) is empty or contains spaces or tabs (` `, `\t`), it must be quoted with `"`. Unnecessary quoting doesn't do any harm.
+If an argument (or the program name) is empty or contains spaces or tabs (<code> </code>, `\t`), it must be quoted with `"`. Unnecessary quoting doesn't do any harm.
 
 It's safer to always quote the program name even if it contains no spaces, [more on that later](#quoting-the-executable-name).
 
@@ -324,7 +324,7 @@ Lastly, in all strings check for `\0`, if your language allows them. (For obviou
 
 What characters need to be quoted? (That's different from characters that need [`^` escaping](#basic-batch-escaping), but we [established](#batch-files-running-other-batch-files) that quotes are the superior form of escaping.)
 
-For batch files, we quote the argument if it contains any of: ` ` spaces, `\t` tabs, `"` quotes, or any of ``<>&|()[]{}^=;!'+,`~``. This list is approximate, some characters might not be needed. I'm certain about:
+For batch files, we quote the argument if it contains any of: <code> </code> spaces, `\t` tabs, `"` quotes, or any of ``<>&|()[]{}^=;!'+,`~``. This list is approximate, some characters might not be needed. I'm certain about:
 
 * Spaces, tabs, and `"`, since they're argument separators.
 * `;,=`, since they are apparently also argument separators in batch?! (For `%1`, `%2`, etc.)
@@ -345,9 +345,9 @@ First of all, when passed in the second argument (`lpCommandLine`) of `CreatePro
 
 ### Trailing garbage in executable name
 
-Secondly, you should error if the executable name contains any trailing ` ` spaces or `.` dots. Or alternatively remove them yourself. (Do this for both `lpApplicationName` if specified, and the first part of `lpCommandLine` if specified.)
+Secondly, you should error if the executable name contains any trailing <code> </code> spaces or `.` dots. Or alternatively remove them yourself. (Do this for both `lpApplicationName` if specified, and the first part of `lpCommandLine` if specified.)
 
-Trailing ` `,`.` are normally ignored by `CreateProcess()` when looking for executable, but are propagated to `argv[0]` as is. **BUT** when dealing with batch files, they are very broken. For example:
+Trailing <code> </code>,`.` are normally ignored by `CreateProcess()` when looking for executable, but are propagated to `argv[0]` as is. **BUT** when dealing with batch files, they are very broken. For example:
 
 * Passing `foo.bat.` as the program name errors, but in a weird way. It DOES start `cmd.exe` to run the batch file, but gives it the path `foo.bat.` literally, and it then complains about not being able to find it.
 
@@ -355,11 +355,11 @@ Trailing ` `,`.` are normally ignored by `CreateProcess()` when looking for exec
 
 * Passing `foo.bat .` as the program name errors in `lpCommandLine` (so when quoted). But when done in `lpApplicationName`, it instead passes `.` as the argument (but normally `lpApplicationName` can't be used to pass arguments!). You can even get multiple arguments in: `foo.bat .. . ...`.
 
-Since trailing ` `,`.` are so broken, it's easier to error on them or trim them yourself. They aren't useful anyway.
+Since trailing <code> </code>,`.` are so broken, it's easier to error on them or trim them yourself. They aren't useful anyway.
 
 ### How to check if it's a batch file?
 
-After stripping trailing ` `,`.`, check if the name ends with `.bat` or `.cmd` (both case-insensitive).
+After stripping trailing <code> </code>,`.`, check if the name ends with `.bat` or `.cmd` (both case-insensitive).
 
 I also recommend enabling batch logic if the executable name is `cmd` or `cmd.exe` (both case-insensitive). CMD has the same escaping quirks since it's what runs batch files. This is best-effort, since the user can refer to this shell in a bunch of different ways (`C:\Windows\System32\cmd.exe`, etc).
 
@@ -380,7 +380,7 @@ The inputs are: an optional string `executable`, and an optional array of string
 2. Let `exe_name` be `executable` if specified, or `argv[0]` otherwise.<br/>
    (`exe_name` is a reference. If the steps below say to modify it, update its source too.)
 
-3. Error if `exe_name` ends with ` ` space or `.` dot. [(details)](#trailing-garbage-in-executable-name)<br/>
+3. Error if `exe_name` ends with <code> </code> space or `.` dot. [(details)](#trailing-garbage-in-executable-name)<br/>
    Or alternatively remove any trailing spaces and dots from it yourself (could be more than one).
 
 4. Check if we're dealing with a batch file: check if `exe_name` ends with `.bat` or `.cmd` (both case-insensitive), or equals `cmd` or `cmd.exe` (again case-insensitive). [(details)](#how-to-check-if-its-a-batch-file)
@@ -400,9 +400,9 @@ The inputs are: an optional string `executable`, and an optional array of string
 
         1. If it's the `0`th element, always quote. [(details)](#quoting-the-executable-name)
 
-        2. Quote if the element contains any of: ` ` spaces, `\t` tabs, `"` quotes. For batch files also check: ``<>&|()[]{}^=;!'+,`~``. [(details)](#what-characters-need-to-be-quoted-in-batch-arguments)
+        2. Quote if the element contains any of: <code> </code> spaces, `\t` tabs, `"` quotes. For batch files also check: ``<>&|()[]{}^=;!'+,`~``. [(details)](#what-characters-need-to-be-quoted-in-batch-arguments)
 
-    2. Write separating space ` ` if it's not the `0`th element.
+    2. Write separating space <code> </code> if it's not the `0`th element.
 
     3. Write opening quote `"` if we're quoting this element.
 
