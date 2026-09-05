@@ -222,7 +222,7 @@ The fun continues!
 
    You might then assume that `foo.bat ^"foo" &calc.exe"` is safe, but it too runs `calc.exe`, and so does `foo.bat "foo^" &calc.exe"`. Meaning that even the escaped quotes update the "are we in a quoted string" flag. It seems `^` only matters on the opening quote, and is ignored on the closing quote.
 
-   Note that escaped quotes still affect argument splitting, so `^"foo bar^"` is considered a single argument by `%1`. (And of course by `CreateProcess()` too, since it doesn't know about `^`; and `^` should get removed by the time `CreateProcess()` is called anyway, unless you escape it 3+ times). Similarly, escaping a space does nothing and doesn't affect splitting: `foo^ bar` is two arguments.
+   Note that escaped quotes still affect argument splitting, so `^"foo bar^"` is considered a single argument by `%1`. (And of course by `CreateProcess()` too, since it doesn't know about `^`; and `^` should get removed by the time `CreateProcess()` is called anyway, unless you escape it twice). Similarly, escaping a space does nothing and doesn't affect splitting: `foo^ bar` is two arguments.
 
    I assume this is because argument splitting runs as a separate pass, between the first and second expansion.
 
