@@ -285,7 +285,7 @@ As mentioned [before](#basic-batch-escaping), it's impossible to prevent `%FOO%`
 
 We can't just ignore this, because you can run arbitrary commands with those, even without needing custom env variables.
 
-[BatBadBut](https://flatt.tech/research/posts/batbadbut-you-cant-securely-execute-commands-on-windows/) shows the following trick: `foo.bat "%CMDCMDLINE:~-1%&calc.exe"`. This runs `calc.exe` despite being quoted. The `CMDCMDLINE` variable returns the `argv` of the process running the script (which is `foo.bat "...."`). The `%  :~-1%` part extracts the last character from it, which is a `"`, which lets this break out from the existing quotes to allow `&` to work. (While you can add whitespace to the end of the command to work around this specific argument, the attacker can then change the substring offset to the new position of the quote.)
+[BatBadBut](https://flatt.tech/research/posts/batbadbut-you-cant-securely-execute-commands-on-windows/) shows the following trick: `foo.bat "%CMDCMDLINE:~-1%&calc.exe"`. This runs `calc.exe` despite being quoted. The `CMDCMDLINE` variable returns the `argv` of the process running the script (which is `foo.bat "...."` in this case). The `%  :~-1%` part extracts the last character from it, which is a `"`, which lets this break out from the existing quotes to allow `&` to work. (While you can add whitespace to the end of the command to work around this specific evil argument, the attacker can then change the substring offset to the new position of the quote.)
 
 The same article suggests a clever escaping method for `%`: `%%cd:~,%`. This produces a single `%`.
 
@@ -327,7 +327,7 @@ In addition to `%` (and optionally `!` if you don't want to prepend `cmd ... /v:
 
 `\n`,`\r` don't seem to be harmful, just weird. Since there's no valid reason to pass them, I'd error on them.
 
-Those need to be banned in the batch file name too, since when it's passed to CMD, it undergoes the same expansion as everything else. E.g. trying to run `foo%FOO%bar.bat` with `FOO=42` will actually run `foo42bar.bat`.
+Those need to be banned in the batch file name too, since when it's passed to CMD, it undergoes the same expansion as everything else. E.g. trying to run `foo%FOO%bar.bat` with `FOO=42` will actually run `foo42bar.bat`. (If both `lpApplicationName` and `lpCommandLine` are specified, then `lpApplicationName` is not passed to CMD and doesn't need to be validated.)
 
 Lastly, in all strings check for `\0`, if your language allows them. (For obvious reasons: `CreateProcess()` needs null-terminated strings.)
 
@@ -370,9 +370,9 @@ First of all, when passed in the second argument (`lpCommandLine`) of `CreatePro
 
 ### Trailing garbage in executable name
 
-Secondly, you should error if the executable name contains any trailing <code> </code> spaces or `.` dots. Or alternatively remove them yourself. (Do this for both `lpApplicationName` if specified, and the first part of `lpCommandLine` if specified.)
+Secondly, you should error if the executable name contains any trailing <code> </code> spaces or `.` dots. Or alternatively remove them yourself. (Do this for `lpApplicationName` if specified, and otherwise for the first part of `lpCommandLine`.)
 
-Trailing <code> </code>,`.` are normally ignored by `CreateProcess()` when looking for executable, but are propagated to `argv[0]` as is. **BUT** when dealing with batch files, they are very broken. For example:
+Trailing <code> </code>,`.` are normally ignored by `CreateProcess()` when looking for the executable, but are propagated to `argv[0]` as is. **BUT** when dealing with batch files, they are very broken. For example:
 
 * Passing `foo.bat.` as the program name errors, but in a weird way. It DOES start `cmd.exe` to run the batch file, but gives it the path `foo.bat.` literally, and it then complains about not being able to find it.
 
@@ -412,7 +412,7 @@ The inputs are: an optional string `executable`, and an optional array of string
 
 5. Check if this is a batch file: check if `exe_name` ends with `.bat` or `.cmd`, case-insensitive. [(details)](#how-to-check-if-its-a-batch-file)
 
-6. If this is batch-or-cmd (per steps 4,5), perform additional argument validation. Error if any element of `argv` (including `0`th) contains any of: `%`, `\n` (line break), `\r` (carriage return). [(details)](#what-characters-need-to-be-banned-in-batch-arguments)
+6. If this is batch-or-cmd (per steps 4, 5), perform additional argument validation. Error if any element of `argv` (including `0`th) contains any of: `%`, `\n` (line break), `\r` (carriage return). [(details)](#what-characters-need-to-be-banned-in-batch-arguments)
 
     If `argv` is null, then instead validate `executable` with this.
 
@@ -440,13 +440,13 @@ The inputs are: an optional string `executable`, and an optional array of string
 
     2. For each element in `argv`:
 
-        * Write separating space <code> </code> if it's not the `0`th element, and if the separator doesn't need to be skipped because of the preceding `/c` (see below).
+        * Write separating space <code> </code> if it's not the `0`th element (and if the separator doesn't need to be skipped because of the preceding `/c`, see below).
 
         * Decide if this element needs to be quoted:
 
             * If it's the `0`th element, always quote. [(details)](#quoting-the-executable-name)
 
-            * Quote if the element contains any of: <code> </code> spaces, `\t` tabs, `"` quotes. If this is batch, also check: ``<>&|()[]{}^=;!'+,`~``. [(details)](#what-characters-need-to-be-quoted-in-batch-arguments)
+            * Quote if the element contains any of: <code> </code> spaces, `\t` tabs, `"` quotes. If this is batch, also check for ``<>&|()[]{}^=;!'+,`~``. [(details)](#what-characters-need-to-be-quoted-in-batch-arguments)
 
         * Write opening quote `"` if we're quoting this element.
 
@@ -455,7 +455,7 @@ The inputs are: an optional string `executable`, and an optional array of string
             * Replace any sequence of 1+ `\` backslashes with twice as many backslashes **only if**:
 
                 * It's right before `"` in this element, or
-                * It's right at the end of the element, and we've decided to quote **this** element.
+                * It's right at the end of the element, and we've decided to quote this element.
 
                 Otherwise leave those `\` unchanged.
 
@@ -472,11 +472,11 @@ The inputs are: an optional string `executable`, and an optional array of string
             * This element equals `/c` (case insensitive).
             * This is a direct CMD invocation per step 4 (or step 7 was executed).
 
-            Then immediately write ` "` (space and a quote), and then skip writing <code> </code> separator on the next iteration.
+            Then immediately write <code> "</code> (space and a quote), and then skip writing <code> </code> separator on the next iteration.
 
     3. Write closing `"` If the whole command needs to be quoted per step 9, or if you handled `/c` as explained earlier. [(details)](#special-quoting-rules-of-cmd-c)
 
-As you can see, this has some knobs for batch files. I'd suggest exposing following modes as a setting:
+As you can see, this has some knobs for batch files. I'd suggest exposing the following modes as a setting:
 
 Mode|Prepend `cmd /d /e:on /v:off /s /c `|Allow&nbsp;`%`|Allow&nbsp;`!`|Comment
 ---|---|---|---|---
