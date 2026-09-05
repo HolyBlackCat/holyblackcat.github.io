@@ -82,9 +82,7 @@ int main(int argc, char **argv)
         std::cout << "argv[" << i << "] = `" << argv[i] << "`\n";
 }
 ```
-Side note: You shouldn't use `argc`, `argv` on Windows for anything but toy programs. Instead use `CommandLineToArgvW(GetCommandLineW(), ...)` to get UTF-16 encoded `argv`, and [convert it to UTF-8 if needed](#unicode).
-
-Using narrow `argv` can lead to some fun vulnerabilities, see ["WorstFit: Unveiling Hidden Transformers in Windows ANSI!"](https://devco.re/blog/2025/01/09/worstfit-unveiling-hidden-transformers-in-windows-ansi/#-argument-splitting).
+Side note: You shouldn't use the narrow `char **argv` on Windows for anything but toy programs. Instead use `CommandLineToArgvW(GetCommandLineW(), ...)` or `int wmain(int argc, wchar_t **argv)` to get UTF-16 encoded `argv`, and [convert it to UTF-8 if needed](#unicode). Using narrow `argv` can lead to some fun vulnerabilities, see ["WorstFit: Unveiling Hidden Transformers in Windows ANSI!"](https://devco.re/blog/2025/01/09/worstfit-unveiling-hidden-transformers-in-windows-ansi/#-argument-splitting).
 
 ### Unicode
 
