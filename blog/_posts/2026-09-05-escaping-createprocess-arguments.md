@@ -13,6 +13,10 @@ Messing up the escaping can lead to [vulnerabilities](https://flatt.tech/researc
 
 This post explains how to do the escaping and quoting correctly. [Skip to the escaping algorithm.](#the-escaping-algorithm)
 
+## Errata
+
+This was updated on 2026-09-06 to cover the [custom quoting rules](#special-quoting-rules-of-cmd-c) of `cmd /c` and fix minor mistakes.
+
 ## Intro
 
 As you may know, unlike on POSIX (Linux, etc), on Windows the command line arguments (`argv`) are internally represented as a single long string. There is a WinAPI function to split it to an `argv`-style array, and the C runtime splits it for you when calling your `main()`, but you can still access the original combined string, and interpret it differently if you want. Most applications respect the stock split.
@@ -21,7 +25,7 @@ Starting a new process (`CreateProcess()`) requires you to provide a single stri
 
 So when you run `./my_program arg1 arg2` in a shell on Windows (at least in CMD, the legacy Windows shell; might no longer be true in PowerShell), the entire line goes straight to `CreateProcess()` with minimal changes. Compare this to POSIX, where it's the shell's job to split the line on spaces/quotes and produce an `argv` array.
 
-WinAPI (in its infinite wisdom) doesn't provide the reverse operation, a function to combine an argument array into one string. You have to implement it yourself, and there's no clear documentation on how to do it. This post explains how to do it.
+WinAPI (in its infinite wisdom) [doesn't provide](#existing-wrapper-functions) the reverse operation, a function to combine an argument array into one string. You have to implement it yourself, and there's no clear documentation on how to do it. This post explains how to do it.
 
 There's no new knowledge here, it's all been explained and done before, just not in one place. I couldn't find good documentation covering everything.
 
@@ -113,6 +117,12 @@ But `lpApplicationName` uses a different search mechanism: unlike `lpCommandLine
 If `lpApplicationName` isn't null but `lpCommandLine` is null, it normally just becomes the quoted version of `lpApplicationName` (so `lpApplicationName` gets passed to `argv[0]`; but also check out [this fun bug](#trailing-garbage-in-executable-name)).
 
 So, in short: to get sane behavior, you usually don't want to pass `lpApplicationName`, only pass `lpCommandLine`.
+
+### Existing wrapper functions
+
+Windows does have `_exec()`/`_spawn()`/etc which accept arguments as separate strings.
+
+But as documented [here](https://learn.microsoft.com/en-us/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way#the-c-runtime-library-is-useless),  they are useless. They don't do any escaping and just combine the arguments with spaces, which leads to wrong results.
 
 ## Basic escaping
 
@@ -284,7 +294,7 @@ This is cool, but problematic for two reasons:
 
 1. As the article itself mentions, it relies on the "command extensions" setting being on. It's on by default, but the user can change it in the registry.
 
-   This can be worked around by prepending `cmd /d /e:on /c ` to `foo.bat` when forming the `CreateProcess()` argument. `/e:on` force enables the extensions, and `/d` disables running startup scripts specified in the registry for a good measure.
+   This can be worked around by prepending `cmd /d /e:on /s /c ` to `foo.bat` when forming the `CreateProcess()` argument. `/e:on` force enables the extensions, and `/d` disables running startup scripts specified in the registry for a good measure, and [see this for `/s`](#special-quoting-rules-of-cmd-c).
 
 2. Not mentioned in the article: Similar to `^`, it can misbehave if the batch file calls another one.
 
@@ -300,11 +310,11 @@ IMO, the trouble is not worth it. `%%cd:~,%` works in some cases but not all, an
 
 `!` does nothing by default, but if you enable a feature called "delayed expansion", it starts behaving similar to `%`, and so is similarly problematic.
 
-Delayed expansion is off by default, but can be enabled with a registry key (or with a certain command in the middle of a batch file, but this doesn't affect us; or with `cmd /v:on`). It can be force disabled by prepending `cmd /d /v:off /c ` to the command line, similar to how we force-enabled command extensions in the previous section (or both at the same time: `cmd /d /e:on /v:off /c `).
+Delayed expansion is off by default, but can be enabled with a registry key (or with a certain command in the middle of a batch file, but this doesn't affect us; or with `cmd /v:on`). It can be force disabled by prepending `cmd /d /v:off /s /c ` to the command line, similar to how we force-enabled command extensions in the previous section (or both at the same time: `cmd /d /e:on /v:off /s /c `).
 
-Since customizing those registry keys is evil, and passing `!` might be useful, I think force prepending `cmd /d /e:on /v:off /c ` to batch files is a good idea. Alternatively we'd have to ban `!` in arguments, like `%`.
+Since customizing those registry keys is evil, and passing `!` might be useful, I think force prepending `cmd /d /e:on /v:off /s /c ` to batch files is a good idea. Alternatively we'd have to ban `!` in arguments, like `%`.
 
-Before you ask, `!!cd:~,!` doesn't seem to work. `cmd /d /v:on "/e:on" /c foo.bat "!!cd:~,!PATH!!cd:~,!"` does print the expanded `PATH`.
+Before you ask, `!!cd:~,!` doesn't seem to work. `cmd /d /v:on /e:on /c foo.bat "!!cd:~,!PATH!!cd:~,!"` does print the expanded `PATH`.
 
 ### What characters need to be banned in batch arguments?
 
@@ -334,6 +344,20 @@ For batch files, we quote the argument if it contains any of: <code> </code> spa
 Less certain about the rest. [This article](https://learn.microsoft.com/en-us/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way) claims those to be special characters: `()%!^"<>&|` (not necessarily quotable). I'm excluding `%` because it ignores quotes. I'd also exclude `!`, but it appears in another list I'll mention in a moment. I have no idea what special effect `()` have.
 
 `cmd /?` has another character list in it: `` &()[]{}^=;!'+,`~``. It's mentioned in a slightly different context, so maybe some of those don't need to be quoted in arguments. They omit `<>|` because they're invalid in filenames (and this list is mentioned in the context of filenames), but we clearly need to quote them. They mention `!` despite not mentioning `%`, so I'll quote it just in case. Not sure why ``()[]{}'+`~`` are listed, but I guess it's safer to quote them too.
+
+### Special quoting rules of `cmd /c`
+
+One more thing. Turns out `cmd ... /c "..."` has a custom behavior of removing the quotes from the rest of the string after `/c` under certain conditions, before doing anything else.
+
+This can happen if the next thing after `/c` (after whitespace) is a `"`. Then it may remove that quote, and remove the final quote in the command (which doesn't have to be at the end of the command).
+
+For example, if given `cmd /c "foo.bat" "&calc.exe"`, it removes the outer quotes and resolves to `foo.bat" "&calc.exe`, which runs `calc.exe`.
+
+This can't be disabled, so we have to lean into it and **always quote the rest of the command after `/c`**.
+
+There is some convoluted corner case where this behavior gets disabled (see `cmd /?`), but we don't want to deal with that, so we **pass `/s`** to get rid of that corner case and unconditionally remove our quotes.
+
+Even if you didn't prepend your own `cmd ... /c`, you still have to deal with this if you specified both `lpApplicationName` and `lpCommandLine`, and `lpApplicationName` is a batch file. Then you have to quote the entire `lpCommandLine`. We have nowhere to pass our `/s` in that case, but it's not an issue, since the quotes are always removed when there are more than two of them, and we'll have 4 because we also always quote the first element in `lpCommandLine` for [unrelated reasons](#quoting-the-executable-name).
 
 ## The executable name
 
@@ -378,50 +402,82 @@ The inputs are: an optional string `executable`, and an optional array of string
    * If `argv` is specified, it can't be empty.
 
 2. Let `exe_name` be `executable` if specified, or `argv[0]` otherwise.<br/>
-   (`exe_name` is a reference. If the steps below say to modify it, update its source too.)
 
 3. Error if `exe_name` ends with <code> </code> space or `.` dot. [(details)](#trailing-garbage-in-executable-name)<br/>
-   Or alternatively remove any trailing spaces and dots from it yourself (could be more than one).
+   Or alternatively remove any trailing spaces and dots from it yourself (could be more than one). If you modify it, propagate the same change to `executable` or `argv[0]`, depending on where you took it from.
 
-4. Check if we're dealing with a batch file: check if `exe_name` ends with `.bat` or `.cmd` (both case-insensitive), or equals `cmd` or `cmd.exe` (again case-insensitive). [(details)](#how-to-check-if-its-a-batch-file)
+4. Check if this is a direct CMD invocation: check if `exe_name` equals `cmd` or `cmd.exe`, case-insensitive. [(details)](#how-to-check-if-its-a-batch-file)<br/>
+    This is best-effort, we don't need to catch all possible spellings of CMD, see link.
 
-5. If this is batch, perform additional argument validation. Error if `executable` or any element of `argv` (including `0`th) contains any of: `%`, `\n` (line break), `\r` (carriage return). [(details)](#what-characters-need-to-be-banned-in-batch-arguments)
+5. Check if this is a batch file: check if `exe_name` ends with `.bat` or `.cmd`, case-insensitive. [(details)](#how-to-check-if-its-a-batch-file)
 
-    You can allow `%`, but it's potentially unsafe. If you do, then you should quote it as explained in the next steps. [(details)](#escaping-)
+6. If this is batch-or-cmd (per steps 4,5), perform additional argument validation. Error if any element of `argv` (including `0`th) contains any of: `%`, `\n` (line break), `\r` (carriage return). [(details)](#what-characters-need-to-be-banned-in-batch-arguments)
 
-6. If this is batch, add some arguments to the beginning of `argv`: `cmd`,`/d`,`/e:on`,`/v:off`,`/c`. Then add the value of `exe_name` (if it wasn't equal to `cmd` or `cmd.exe` on step 4). Lastly, replace `exe_name` with string `cmd`. [(details)](#escaping--1)
+    If `argv` is null, then instead validate `executable` with this.
 
-    Step 6 is not strictly necessary, but if you don't do it, then you should also reject `!` (and `%`) earlier on step 5.
+    You can allow `%`, but it's potentially unsafe. If you do, then you should escape it as explained in the next steps. [(details)](#escaping-)
 
+7. If this is batch, prepend the CMD invocation:
 
-7. To assemble the command string, for each element in `argv`:
+    * If `argv` is null, make it empty instead.
 
-    1. Decide if it needs to be quoted:
+    * Prepend those elements to `argv`: `cmd`,`/d`,`/e:on`,`/v:off`,`/s`,`/c`.
 
-        1. If it's the `0`th element, always quote. [(details)](#quoting-the-executable-name)
+    * If `argv` was originally null, add the value of `executable` at the end of it.
 
-        2. Quote if the element contains any of: <code> </code> spaces, `\t` tabs, `"` quotes. For batch files also check: ``<>&|()[]{}^=;!'+,`~``. [(details)](#what-characters-need-to-be-quoted-in-batch-arguments)
+    * Reset `executable` to null.
 
-    2. Write separating space <code> </code> if it's not the `0`th element.
+    * Update the bools from steps 4 and 5: now "is cmd" = true, "is batch" = false.
 
-    3. Write opening quote `"` if we're quoting this element.
+    The entire step 7 can be skipped, but if you skip it, then you should also reject `!` (and `%`) earlier on step 6. [(details)](#escaping--1)
 
-    4. Write the modified element string:
-        1. Replace any `"` with `""`.
-        2. Replace any sequence of 1+ `\` backslashes with twice as many backslashes **only if**:
+8. Decide if the entire command needs to be quoted: check if `executable` isn't null and this is batch per step 5 (if you executed step 7, it's no longer considered batch). [(details)](#special-quoting-rules-of-cmd-c)
 
-            1. It's right before a `"`, or
-            2. It's right at the end of the element, and we've decided to quote this element.
+9. To assemble the command string:
 
-            Otherwise leave those `\` unchanged.
+    1. If the whole command needs to be quoted per step 8, write opening quote `"`. [(details)](#special-quoting-rules-of-cmd-c)
 
-        3. If you decided to allow `%` on step 5, replace those with `%%cd:~,%`.
+    2. For each element in `argv`:
 
-    5. Write closing quote `"` if we're quoting this element.
+        * Write separating space <code> </code> if it's not the `0`th element, and if the separator doesn't need to be skipped because of the preceding `/c` (see below).
+
+        * Decide if this element needs to be quoted:
+
+            * If it's the `0`th element, always quote. [(details)](#quoting-the-executable-name)
+
+            * Quote if the element contains any of: <code> </code> spaces, `\t` tabs, `"` quotes. If this is batch, also check: ``<>&|()[]{}^=;!'+,`~``. [(details)](#what-characters-need-to-be-quoted-in-batch-arguments)
+
+        * Write opening quote `"` if we're quoting this element.
+
+        * Write the modified element string:
+            * Replace any `"` with `""`.
+            * Replace any sequence of 1+ `\` backslashes with twice as many backslashes **only if**:
+
+                * It's right before `"` in this element, or
+                * It's right at the end of the element, and we've decided to quote **this** element.
+
+                Otherwise leave those `\` unchanged.
+
+                (Note that if this is the last element, and it's not quoted, and the entire command is quoted because of step 8 or `/c`, then `\`s at the end of this element still do **not** need to be duplicated. They are only duplicated if this element is quoted individually.)
+
+            * If you decided to allow `%` on step 6, replace those with `%%cd:~,%`.
+
+        * Write closing quote `"` if we're quoting this element.
+
+        * Do the custom handling for for `/c`. [(details)](#special-quoting-rules-of-cmd-c)<br/>
+            If all of the following are true: (this happen to be mutually exclusive with step 8)
+
+            * We didn't have a `/c` yet.
+            * This element equals `/c` (case insensitive).
+            * This is a direct CMD invocation per step 4 (or step 7 was executed).
+
+            Then immediately write ` "` (space and a quote), and then skip writing <code> </code> separator on the next iteration.
+
+    3. Write closing `"` If the whole command needs to be quoted per step 9, or if you handled `/c` as explained earlier. [(details)](#special-quoting-rules-of-cmd-c)
 
 As you can see, this has some knobs for batch files. I'd suggest exposing following modes as a setting:
 
-Mode|Prepend `cmd /d /e:on /v:off /c `|Allow&nbsp;`%`|Allow&nbsp;`!`|Comment
+Mode|Prepend `cmd /d /e:on /v:off /s /c `|Allow&nbsp;`%`|Allow&nbsp;`!`|Comment
 ---|---|---|---|---
 Default|Yes|No|Yes|Seems to be a good default.
 Relaxed|Yes|Yes<br/>(escaped)|Yes|Can be unsafe on some batch files.
