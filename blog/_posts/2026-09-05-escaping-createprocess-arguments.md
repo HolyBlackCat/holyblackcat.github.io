@@ -240,7 +240,7 @@ Some sources recommend quoting arguments as `^"...^"`, with every special charac
 
 One batch file can call another. In several different ways:
 
-1. Natively running `foo.bat %*` from another batch file behaves like `exec` - it runs that file and then stops, instead of returning to the previous batch file.
+1. Naively running `foo.bat %*` from another batch file behaves like `exec` - it runs that file and then stops, instead of returning to the previous batch file.
 2. `call foo.bat %*` behaves as you'd expect (goes back to the previous batch file after executing that one).
 3. `cmd /c foo.bat %*` behaves similar to `call ...` (with some extra expanding).
 
@@ -274,7 +274,7 @@ As mentioned [before](#basic-batch-escaping), it's impossible to prevent `%FOO%`
 
 We can't just ignore this, because you can run arbitrary commands with those, even without needing custom env variables.
 
-[BatBadBut](https://flatt.tech/research/posts/batbadbut-you-cant-securely-execute-commands-on-windows/) shows the following trick: `foo.bat "%CMDCMDLINE:~-1%&calc.exe"`. This runs `calc.exe` despite being quoted. The `CMDCMDLINE` variable returns the `argv` of the process running the script, so it's literally the same command. The `%  :~-1%` part extracts the last character from it, which is a `"`, which lets this break out from the existing quotes to allow `&` to work. (While you can add whitespace to the end of the command to work around this specific argument, the attacker can then change the substring offset to the new position of the quote.)
+[BatBadBut](https://flatt.tech/research/posts/batbadbut-you-cant-securely-execute-commands-on-windows/) shows the following trick: `foo.bat "%CMDCMDLINE:~-1%&calc.exe"`. This runs `calc.exe` despite being quoted. The `CMDCMDLINE` variable returns the `argv` of the process running the script (which is `foo.bat "...."`). The `%  :~-1%` part extracts the last character from it, which is a `"`, which lets this break out from the existing quotes to allow `&` to work. (While you can add whitespace to the end of the command to work around this specific argument, the attacker can then change the substring offset to the new position of the quote.)
 
 The same article suggests a clever escaping method for `%`: `%%cd:~,%`. This produces a single `%`.
 
@@ -322,13 +322,12 @@ Lastly, in all strings check for `\0`, if your language allows them. (For obviou
 
 ### What characters need to be quoted in batch arguments?
 
-What characters need to be quoted? (That's different from characters that need [`^` escaping](#basic-batch-escaping), but we established that quotes are the superior form of escaping.)
+What characters need to be quoted? (That's different from characters that need [`^` escaping](#basic-batch-escaping), but we [established](#batch-files-running-other-batch-files) that quotes are the superior form of escaping.)
 
 For batch files, we quote the argument if it contains any of: ` ` spaces, `\t` tabs, `"` quotes, or any of ``<>&|()[]{}^=;!'+,`~``. This list is approximate, some characters might not be needed. I'm certain about:
 
-  * Spaces, tabs, and `"`, since they're argument separators.
-  * `;,=`, since they are apparently also argument separators in batch?! (For `%1`, `%2`, etc.)
-
+* Spaces, tabs, and `"`, since they're argument separators.
+* `;,=`, since they are apparently also argument separators in batch?! (For `%1`, `%2`, etc.)
 * `<>&|` because they have obvious special meaning (redirection, separating commands).
 * `^` because it's the escape character.
 
@@ -364,7 +363,7 @@ After stripping trailing ` `,`.`, check if the name ends with `.bat` or `.cmd` (
 
 I also recommend enabling batch logic if the executable name is `cmd` or `cmd.exe` (both case-insensitive). CMD has the same escaping quirks since it's what runs batch files. This is best-effort, since the user can refer to this shell in a bunch of different ways (`C:\Windows\System32\cmd.exe`, etc).
 
-   Covering any possible spelling of `cmd` seems unnecessary, since the paranoid escaping logic is important only when the executable name is hardcoded but the arguments are user-provided. If the executable name is user-provided, they can already run anything they want.
+Covering any possible spelling of `cmd` seems unnecessary, since the paranoid escaping logic is important only when the executable name is hardcoded but the arguments are user-provided. If the executable name is user-provided, they can already run anything they want.
 
 ## The escaping algorithm
 
