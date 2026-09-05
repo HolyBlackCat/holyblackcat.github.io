@@ -341,7 +341,7 @@ Lastly, the executable name passed to `CreateProcess()` has a few quirks that ne
 
 ### Quoting the executable name
 
-First of all, when passed in the second argument (`lpCommandLine`) of `CreateProcess()`, it **must** be quoted regardless of the contents. If not quoted, then `C:\foo bar.exe` is ambiguous between running `C:\foo bar.exe` and running `C:\foo.exe` with argument `bar.exe`. It'll check multiple options and run the matching one (the [docs](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw) say it tries shorter ones first). Quotes disable this behavior and make it not ambiguous.
+First of all, when passed in the second argument (`lpCommandLine`) of `CreateProcess()`, it **must** be quoted regardless of the contents. If not quoted, then `C:\foo bar.exe` is ambiguous between running `C:\foo bar.exe` and running `C:\foo.exe` with argument `bar.exe`. It'll check different paths and run the one that exists (the [docs](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw) say it tries shorter ones first). Quotes disable this behavior and make it not ambiguous.
 
 ### Trailing garbage in executable name
 
