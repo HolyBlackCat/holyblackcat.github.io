@@ -445,24 +445,19 @@ For simplicity you can get rid of the `executable` parameter and only allow `arg
             * We didn't have such `/c` or `/k` yet. (They are mutually exclusive. As soon as you've seen one, stop checking for both of them.)
             * This element equals `/c` or `/k`, case insensitive.
 
-        * If this is the special `/c` or `/k` per the previous step, insert some extra arguments if we haven't encountered them yet:
-
-            * `/d` if we haven't seen it yet.
-            * `/e:on` if we haven't seen anything starting with `/e` yet.
-            * `/v:off` if we haven't seen anything starting with `/v` yet.
-            * `/s` if we haven't seen it yet.
+        * If this is the special `/c` or `/k` per the previous step, insert some extra arguments if we haven't encountered them yet: `/d`, `/e:on`, `/v:off`, `/s`.
 
             Here everything other than `/s` is optional, and just ensures sane settings. Perhaps you should skip those optional arguments if you also skip step 7.
 
-            Have a bool for each. Start tracking those arguments if this is a direct CMD invocation per step `4`, and stop tracking when hitting the special `/c` or `/k`.
+            Have a bool for each of those. Start tracking those arguments if this is a direct CMD invocation per step `4`, and stop tracking when hitting the special `/c` or `/k`.
 
-            Each of those should be checked case-insensitive. Don't check the `0`th element.
+            Each of those should be checked case-insensitive. Only compare the first two characters of the element, since they can be followed by garbage and still get enabled.
+
+            Don't check the `0`th element.
 
             When inserting those arguments, prepend a separating space to each.
 
-            Note that we check for `/v`,`/e`, and not `/v:`,`/e:`. Inserting garbage or nothing instead of `:` turns those on.
-
-            Unlike `/v` and `/e`, `/d` doesn't have a negative version, so with this logic the user can't override it (so you should have a knob to disable `/d`,`/e`,`/v`).
+            Unlike `/v` and `/e`, `/d` doesn't have a negative version, so with this logic the user can't override it (so you should have a knob to disable `/d`,`/e:on`,`/v:off`).
 
         * Write separating space <code> </code> if it's not the `0`th element (and if the separator doesn't need to be skipped because of the preceding `/c` or `/k`, see below).
 
