@@ -438,16 +438,31 @@ For simplicity you can get rid of the `executable` parameter and only allow `arg
     2. For each element in `argv`:
 
         * Check if this is a `/c` that needs custom handling. [(details)](#special-quoting-rules-of-cmd-c)<br/>
-            If all of the following are true: (this happens to be mutually exclusive with step 8)
+            Check if all of the following are true: (this happens to be mutually exclusive with step 8)
 
-            * We didn't have such `/c` yet.
-            * This is not the `0`th element.
-            * This element equals `/c` (case insensitive).
             * This is a direct CMD invocation per step 4 (or step 7 was executed).
+            * This is not the `0`th element.
+            * We didn't have such `/c` yet.
+            * This element equals `/c` (case insensitive).
 
-        * If this is the special `/c` per the previous step, and we haven't encountered argument `/s` yet (case-insensitive, can't be the `0`th element), then write our own <code> /s</code> (with a separating space).
+        * If this is the special `/c` per the previous step, insert some extra arguments if we haven't encountered them yet:
 
+            * `/d` if we haven't seen it yet.
+            * `/e:on` if we haven't seen anything starting with `/e` yet.
+            * `/v:off` if we haven't seen anything starting with `/v` yet.
+            * `/s` if we haven't seen it yet.
 
+            Here everything other than `/s` is optional, and just ensures sane settings. Perhaps you should skip those optional arguments if you also skip step 7.
+
+            Have a bool for each. Start tracking those arguments if this is a direct CMD invocation per step `4`, and stop tracking when hitting the special `/c`.
+
+            Each of those should be checked case-insensitive. Don't check the `0`th element.
+
+            When inserting those arguments, prepend a separating space to each.
+
+            Note that we check for `/v`,`/e`, and not `/v:`,`/e:`. Inserting garbage or nothing instead of `:` turns those on.
+
+            Unlike `/v` and `/e`, `/d` doesn't have a negative version, so with this logic the user can't override it (so you should have a knob to disable `/d`,`/e`,`/v`).
 
         * Write separating space <code> </code> if it's not the `0`th element (and if the separator doesn't need to be skipped because of the preceding `/c`, see below).
 
@@ -487,7 +502,7 @@ Relaxed|Yes|Yes<br/>(escaped)|Yes|Can be unsafe on some batch files.
 Keep registry settings|No|No|No|Safe, but the user messing with registry keys can affect your batch files.
 Unsafe|No|Yes (not escaped)|Yes|Unsafe.
 
-This could be exposed as an enum, or perhaps two bools (`keep_registry_settings` and `unsafe`).
+This could be exposed as an enum, or perhaps two bools (`keep_registry_settings` to enable 3 or 4, and `unsafe` to enable 2 or 4).
 
 &nbsp;
 
