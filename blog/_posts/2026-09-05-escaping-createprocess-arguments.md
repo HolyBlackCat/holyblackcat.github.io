@@ -398,6 +398,8 @@ If you're using `CreateProcessW()` ([as you probably should](#unicode)) which ac
 
 The inputs are: an optional string `executable`, and an optional array of strings `argv` (that correspond to the [two parameters of `CreateProcess()`](#basic-use-of-createprocess)). Normally you'd only specify `argv`.
 
+The outputs are: an optional string `executable` (possibly modified compared to the input), and an optional string combined from `argv`.
+
 For simplicity you can get rid of the `executable` parameter and only allow `argv`. Then you lose the ability to have `argv[0]` differ from the executable path.
 
 1. Check for bad inputs:
@@ -436,9 +438,9 @@ For simplicity you can get rid of the `executable` parameter and only allow `arg
 
     The entire step 7 can be skipped, but if you skip it, then you should also reject `!` (and `%`) earlier on step 6. [(details)](#escaping--1)
 
-8. Decide if the entire command needs to be quoted: check if `executable` isn't null and this is batch per step 5 (if you executed step 7, it's no longer considered batch). [(details)](#special-quoting-rules-of-cmd-c)
+8. Decide if the entire command needs to be quoted: check if both `executable` and `argv` are specified, and this is batch per step 5 (if you executed step 7, this will be false, because `executable` is now null, and because it's no longer considered batch). [(details)](#special-quoting-rules-of-cmd-c)
 
-9. To assemble the command string:
+9. If `argv` is not null, assemble the command string from it:
 
     1. If the whole command needs to be quoted per step 8, write opening quote `"`. [(details)](#special-quoting-rules-of-cmd-c)
 
