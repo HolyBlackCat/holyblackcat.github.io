@@ -344,13 +344,13 @@ Less certain about the rest. [This article](https://learn.microsoft.com/en-us/ar
 
 ### Special quoting rules of `cmd /c`
 
-One more thing. Turns out `cmd ... /c "..."` has a custom behavior of removing the quotes from the rest of the string after `/c` under certain conditions, before doing anything else.
+One more thing. Turns out `cmd ... /c "..."` and `cmd ... /k "..."` have a custom behavior of removing the quotes from the rest of the string after `/c` under certain conditions, before doing anything else.
 
-This can happen if the next thing after `/c` (after whitespace) is a `"`. Then it may remove that quote, and remove the final quote in the command (which doesn't have to be at the end of the command).
+This can happen if the next thing after `/c` or `/k` (after whitespace) is a `"`. Then it may remove that quote, and remove the final quote in the command (which doesn't have to be at the end of the command).
 
 For example, if given `cmd /c "foo.bat" "&calc.exe"`, it removes the outer quotes and resolves to `foo.bat" "&calc.exe`, which runs `calc.exe`.
 
-This can't be disabled, so we have to lean into it and **always quote the rest of the command after `/c`**.
+This can't be disabled, so we have to lean into it and **always quote the rest of the command after `/c` or `/k`**.
 
 There is some convoluted corner case where this behavior gets disabled (see `cmd /?`), but we don't want to deal with that, so we **pass `/s`** to get rid of that corner case and unconditionally remove our quotes.
 
@@ -437,15 +437,15 @@ For simplicity you can get rid of the `executable` parameter and only allow `arg
 
     2. For each element in `argv`:
 
-        * Check if this is a `/c` that needs custom handling. [(details)](#special-quoting-rules-of-cmd-c)<br/>
+        * Check if this is a `/c` or `/k` that needs custom handling. [(details)](#special-quoting-rules-of-cmd-c)<br/>
             Check if all of the following are true: (this happens to be mutually exclusive with step 8)
 
             * This is a direct CMD invocation per step 4 (or step 7 was executed).
             * This is not the `0`th element.
-            * We didn't have such `/c` yet.
-            * This element equals `/c` (case insensitive).
+            * We didn't have such `/c` or `/k` yet. (They are mutually exclusive. As soon as you've seen one, stop checking for both of them.)
+            * This element equals `/c` or `/k`, case insensitive.
 
-        * If this is the special `/c` per the previous step, insert some extra arguments if we haven't encountered them yet:
+        * If this is the special `/c` or `/k` per the previous step, insert some extra arguments if we haven't encountered them yet:
 
             * `/d` if we haven't seen it yet.
             * `/e:on` if we haven't seen anything starting with `/e` yet.
@@ -454,7 +454,7 @@ For simplicity you can get rid of the `executable` parameter and only allow `arg
 
             Here everything other than `/s` is optional, and just ensures sane settings. Perhaps you should skip those optional arguments if you also skip step 7.
 
-            Have a bool for each. Start tracking those arguments if this is a direct CMD invocation per step `4`, and stop tracking when hitting the special `/c`.
+            Have a bool for each. Start tracking those arguments if this is a direct CMD invocation per step `4`, and stop tracking when hitting the special `/c` or `/k`.
 
             Each of those should be checked case-insensitive. Don't check the `0`th element.
 
@@ -464,7 +464,7 @@ For simplicity you can get rid of the `executable` parameter and only allow `arg
 
             Unlike `/v` and `/e`, `/d` doesn't have a negative version, so with this logic the user can't override it (so you should have a knob to disable `/d`,`/e`,`/v`).
 
-        * Write separating space <code> </code> if it's not the `0`th element (and if the separator doesn't need to be skipped because of the preceding `/c`, see below).
+        * Write separating space <code> </code> if it's not the `0`th element (and if the separator doesn't need to be skipped because of the preceding `/c` or `/k`, see below).
 
         * Decide if this element needs to be quoted:
 
@@ -483,15 +483,15 @@ For simplicity you can get rid of the `executable` parameter and only allow `arg
 
                 Otherwise leave those `\` unchanged.
 
-                (Note that if this is the last element, and it's not quoted, and the entire command is quoted because of step 8 or `/c`, then `\`s at the end of this element still do **not** need to be duplicated. They only need to be duplicated if this element is quoted individually.)
+                (Note that if this is the last element, and it's not quoted, and the entire command is quoted because of step 8 or `/c` or `/k`, then `\`s at the end of this element still do **not** need to be duplicated. They only need to be duplicated if this element is quoted individually.)
 
             * If you decided to allow `%` on step 6, replace those with `%%cd:~,%`.
 
         * Write closing quote `"` if we're quoting this element.
 
-        * If this is the special `/c` (as mentioned earlier), write <code> "</code> (space and a quote), and then skip writing <code> </code> separator on the next iteration.
+        * If this is the special `/c` or `/k` (as mentioned earlier), write <code> "</code> (space and a quote), and then skip writing <code> </code> separator on the next iteration.
 
-    3. Write closing `"` If the whole command needs to be quoted per step 8, or if you handled `/c` as explained earlier. [(details)](#special-quoting-rules-of-cmd-c)
+    3. Write closing `"` If the whole command needs to be quoted per step 8, or if you handled `/c` or `/k` as explained earlier. [(details)](#special-quoting-rules-of-cmd-c)
 
 As you can see, this has some knobs for batch files. I'd suggest exposing the following modes as a setting:
 
