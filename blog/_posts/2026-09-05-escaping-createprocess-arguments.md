@@ -396,16 +396,15 @@ Covering any possible spelling of `cmd` seems unnecessary, since the paranoid es
 
 If you're using `CreateProcessW()` ([as you probably should](#unicode)) which accepts wide strings, you can either run this algorithm directly on UTF-16 strings, or on UTF-8 strings and then widen the result.
 
-The inputs are: an optional string `executable`, and an optional array of strings `argv` (that correspond to the [two parameters of `CreateProcess()`](#basic-use-of-createprocess)). Normally you'd only specify `argv`.
+The inputs are: an optional string `executable`, and a possibly empty array of strings `argv` (that correspond to the [two parameters of `CreateProcess()`](#basic-use-of-createprocess)). Normally you'd only specify `argv`.
 
 The outputs are: an optional string `executable` (possibly modified compared to the input), and an optional string combined from `argv`.
 
 For simplicity you can get rid of the `executable` parameter and only allow `argv`. Then you lose the ability to have `argv[0]` differ from the executable path.
 
 1. Check for bad inputs:
-   * At least one parameter of the two must be specified.
-   * If `argv` is specified, it can't be empty.
-   * `executable` and `argv` can't contain `\0`.
+   * At least one parameter of the two must be specified. Error if both `executable` is null and `argv` is empty.
+   * `executable` and `argv` can't contain `\0` null characters.
 
 2. Let `exe_name` be `executable` if specified, or `argv[0]` otherwise.<br/>
 
@@ -419,17 +418,15 @@ For simplicity you can get rid of the `executable` parameter and only allow `arg
 
 6. If this is batch-or-cmd (per steps 4, 5), perform additional argument validation. Error if any element of `argv` (including `0`th) contains any of: `%`, `\n` (line break), `\r` (carriage return). [(details)](#what-characters-need-to-be-banned-in-batch-arguments)
 
-    If `argv` is null, then instead validate `executable` with this.
+    If `argv` is empty, then instead validate `executable` with this.
 
     You can allow `%`, but it's potentially unsafe. If you allow it, then you should escape it as explained in the next steps. [(details)](#escaping-)
 
 7. If this is batch, prepend the CMD invocation:
 
-    * If `argv` is null, make it empty instead.
-
     * Prepend those elements to `argv`: `cmd`,`/d`,`/e:on`,`/v:off`,`/s`,`/c`.
 
-    * If `argv` was originally null, add the value of `executable` at the end of it.
+    * If `argv` was empty before this step, add the value of `executable` at the end of it.
 
     * Reset `executable` to null.<br/>
       (If both `executable` and `argv` were specified, it means the value of `executable` is lost. But this is intentional. It almost matches the stock behavior, where if `executable` is batch, the `argv` is just passed to CMD, and doesn't have to actually run that batch file. The only difference is that the stock behavior requires the batch file to exist, and this doesn't, unless you want to add that check yourself.)
@@ -438,9 +435,9 @@ For simplicity you can get rid of the `executable` parameter and only allow `arg
 
     The entire step 7 can be skipped, but if you skip it, then you should also reject `!` (and `%`) earlier on step 6. [(details)](#escaping--1)
 
-8. Decide if the entire command needs to be quoted: check if both `executable` and `argv` are specified, and this is batch per step 5 (if you executed step 7, this will be false, because `executable` is now null, and because it's no longer considered batch). [(details)](#special-quoting-rules-of-cmd-c)
+8. Decide if the entire command needs to be quoted: check if both `executable` is not null and `argv` is not empty, and this is batch per step 5 (if you executed step 7, this will be false, because `executable` is now null, and because it's no longer considered batch). [(details)](#special-quoting-rules-of-cmd-c)
 
-9. If `argv` is not null, assemble the command string from it:
+9. If `argv` is not empty, assemble the command string from it. (Otherwise return null for the command.)
 
     1. If the whole command needs to be quoted per step 8, write opening quote `"`. [(details)](#special-quoting-rules-of-cmd-c)
 
