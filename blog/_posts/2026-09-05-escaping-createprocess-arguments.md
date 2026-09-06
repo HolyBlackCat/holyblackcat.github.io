@@ -429,7 +429,8 @@ For simplicity you can get rid of the `executable` parameter and only allow `arg
 
     * If `argv` was originally null, add the value of `executable` at the end of it.
 
-    * Reset `executable` to null.
+    * Reset `executable` to null.<br/>
+      (If both `executable` and `argv` were specified, it means the value of `executable` is lost. But this is intentional. It almost matches the stock behavior, where if `executable` is batch, the `argv` is just passed to CMD, and doesn't have to actually run that batch file. The only difference is that the stock behavior requires the batch file to exist, and this doesn't, unless you want to add that check yourself.)
 
     * Update the bools from steps 4 and 5: now "is cmd" = true, "is batch" = false.
 
