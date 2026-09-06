@@ -17,6 +17,8 @@ This post explains how to do the escaping and quoting correctly. [Skip to the es
 
 This was updated on 2026-09-06 to cover the [custom quoting rules](#special-quoting-rules-of-cmd-c) of `cmd /c` and fix minor mistakes.
 
+Minor changes not affecting the escaping algorithm may not be listed here.
+
 ## Intro
 
 As you may know, unlike on POSIX (Linux, etc), on Windows the command line arguments (`argv`) are internally represented as a single long string. There is a WinAPI function to split it to an `argv`-style array, and the C runtime splits it for you when calling your `main()`, but you can still access the original combined string, and interpret it differently if you want. Most applications respect the stock split.
@@ -41,11 +43,11 @@ Main sources:
 
 * [Zig PR](https://github.com/ziglang/zig/pull/19698) implementing and explaining most of this.
 
-## Basic use of `CreateProcessW()`
+## Basic use of `CreateProcess()`
 
 ### Test snippets
 
-Here's a minimal program calling `CreateProcessW()`:
+Here's a minimal program calling `CreateProcess()`:
 ```cpp
 #include <windows.h>
 #include <iostream>
@@ -72,7 +74,7 @@ int main()
     }
 }
 ```
-And here's a handy program that prints `argv`. No unicode support.
+And here's a handy program that prints `argv`. No unicode support by default, see below.
 ```cpp
 #include <iostream>
 
@@ -82,36 +84,36 @@ int main(int argc, char **argv)
         std::cout << "argv[" << i << "] = `" << argv[i] << "`\n";
 }
 ```
-Side note: You shouldn't use the narrow `char **argv` on Windows for anything but toy programs. Instead use `CommandLineToArgvW(GetCommandLineW(), ...)` or `int wmain(int argc, wchar_t **argv)` to get UTF-16 encoded `argv`, and [convert it to UTF-8 if needed](#unicode). Using narrow `argv` can lead to some fun vulnerabilities, see ["WorstFit: Unveiling Hidden Transformers in Windows ANSI!"](https://devco.re/blog/2025/01/09/worstfit-unveiling-hidden-transformers-in-windows-ansi/#-argument-splitting).
+Side note: By default the narrow `char **argv` is unusable for anything serious because of the missing unicode support. You should either enable UTF-8 support for it through [the manifest](https://learn.microsoft.com/en-us/windows/apps/design/globalizing/use-utf8-code-page) (if you're not a library developer and can control the manifest), or use `CommandLineToArgvW(GetCommandLineW(), ...)` or `int wmain(int argc, wchar_t **argv)` to get UTF-16 encoded `argv`, and then [convert it to UTF-8 if needed](#unicode). If you don't do any of this and keep the default behavior, then in addition to missing unicode support you may also get vulnerabilities, see ["WorstFit: Unveiling Hidden Transformers in Windows ANSI!"](https://devco.re/blog/2025/01/09/worstfit-unveiling-hidden-transformers-in-windows-ansi/#-argument-splitting).
 
 ### Unicode
 
-See: [Unicode in the Windows API](https://learn.microsoft.com/en-us/windows/win32/intl/unicode-in-the-windows-api).
+See: [Unicode in the Windows API](https://learn.microsoft.com/en-us/windows/win32/intl/unicode-in-the-windows-api) and [Use UTF-8 code pages in Windows apps](https://learn.microsoft.com/en-us/windows/apps/design/globalizing/use-utf8-code-page).
 
-There are `CreateProcess()`, `CreateProcessA()`, and `CreateProcessW()`. You want to use `CreateProcessW()`.
+There are `CreateProcess()`, `CreateProcessA()`, and `CreateProcessW()`. You probably want to use `CreateProcessW()`.
 
 Like many other WinAPI functions, `CreateProcess()` has two versions: `CreateProcessW()` that uses UTF-16 and `CreateProcessA()` that uses the currently active code page (so a narrow string, but usually not UTF-8). `CreateProcess()` is a macro that's defined to one or the other (depending on `#define UNICODE`, but that doesn't matter).
 
-`CreateProcessA()` is basically unusable for anything serious, because it can't deal with unicode, and can only handle a very limited set of symbols from the active code page. In theory you can set the active code page to UTF-8, but if you're a library, asking the users to do that isn't nice.
+By default `CreateProcessA()`, is basically unusable for anything serious, because it can't deal with unicode, and can only handle a very limited set of symbols from the active code page. You can fix that by setting the active code page to UTF-8 ([e.g. through the manifest](https://learn.microsoft.com/en-us/windows/apps/design/globalizing/use-utf8-code-page), or should be possible at runtime too), but if you're a library, asking the users to do that isn't nice.
 
-`CreateProcess()` (without `A`/`W`) and `#define UNICODE` are even more useless.
+`CreateProcess()` (without `A`/`W`) and `#define UNICODE` are even more useless. Having code that compiles both with narrow and wide strings depending on a macro is a lot of work for little benefit, just choose one.
 
-Since the UTF-16 is what's actually used under the hood, you want to use the UTF-16 version, `CreateProcessW()`. If your strings are UTF-8 (as they should be), convert them to UTF-16 using [`MultiByteToWideChar()`](https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-multibytetowidechar) or some other method.
+Since the UTF-16 is what's actually used under the hood, you usually want to use the UTF-16 version, `CreateProcessW()`. If your strings are UTF-8 (as they should be), convert them to UTF-16 using [`MultiByteToWideChar()`](https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-multibytetowidechar) or some other method.
 
-Also consider using [WTF-8](https://wtf-8.codeberg.page) instead of UTF-8 to store the original strings. Some invalid UTF-16 strings (that can nonetheless appear in file paths) are impossible to represent as UTF-8, but you can trivially extend it to fix it (which is what WTF-8 is).
+Also consider using [WTF-8](https://wtf-8.codeberg.page) instead of UTF-8 to store the original strings. Some invalid UTF-16 strings (that can nonetheless appear in file paths) are impossible to represent as UTF-8, but you can trivially extend it to fix it (which is what WTF-8 is). From what I understand, using the narrow `CreateProcessA()` (with UTF-8 codepage) makes those impossible to support, so might not be the best idea.
 
 ### Arguments of `CreateProcess()`
 
-[`CreateProcess()`](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw) takes two strings (the first two arguments). For the `CreateProcessW()` version, they are pointers to `wchar_t`, so you can store them in `std::wstring`.
+[`CreateProcess()`](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw) takes two strings (the first two arguments). For the `CreateProcessW()` version, they are pointers to `wchar_t`, so you can store them in `std::wstring`. (And for `CreateProcessA()` they are pointers to `char`, see [the section about unicode in WinAPI](#unicode).)
 
 The signature is `(const wchar_t *lpApplicationName, wchar_t *lpCommandLine, ....)`.
 
 * `lpApplicationName` is usually not needed, you should pass `nullptr`.
 * `lpCommandLine` is the executable, followed by its arguments, space-separated.
 
-The function (specifically the `CreateProcessW()` version) can modify the second string. It's unspecified what it does with it, the important part is that the string you pass can't be const.
+The function can modify the second string. It's unspecified what it does with it, the important part is that the string you pass can't be const. (This is only true for the `CreateProcessW()` variant. [`CreateProcessA()`](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessa) still takes a non-const `char *`, but promises to not modify it, so there you can `const_cast`.)
 
-If `lpApplicationName` isn't null, it's used instead of the first part of `lpCommandLine` as the executable path. But the first part of `lpCommandLine` still ends up passed to `argv[0]` of the new process, which by convention should match the executable path. So this is exactly the same as what POSIX does: `argv[0]` usually matches the executable name, but is not required to.
+If `lpApplicationName` isn't null, it's used instead of the first part of `lpCommandLine` as the executable path. But the first part of `lpCommandLine` still ends up passed to `argv[0]` of the new process, which by convention should match the executable path. So this is the same as what POSIX does: `argv[0]` usually matches the executable name, but is not required to.
 
 But `lpApplicationName` uses a different search mechanism: unlike `lpCommandLine` it doesn't respect `PATH` and doesn't allow the `.exe` extension to be omitted. If the path is relative, it searches relative to the current directory (which `lpCommandLine` does too, unlike on POSIX). If `lpApplicationName` starts with `\`, it searches on the current drive letter, so usually `\foo\bar.exe` -> `C:\foo\bar.exe`.
 
@@ -392,10 +394,11 @@ Covering any possible spelling of `cmd` seems unnecessary, since the paranoid es
 
 ## The escaping algorithm
 
+If you're using `CreateProcessW()` ([as you probably should](#unicode)) which accepts wide strings, you can either run this algorithm directly on UTF-16 strings, or on UTF-8 strings and then widen the result.
 
-You can run this algorithm either on [wide strings](#unicode) directly, or on narrow ones and then widen the final result.
+The inputs are: an optional string `executable`, and an optional array of strings `argv` (that correspond to the [two parameters of `CreateProcess()`](#basic-use-of-createprocess)). Normally you'd only specify `argv`.
 
-The inputs are: an optional string `executable`, and an optional array of strings `argv` (that correspond to the [two parameters of `CreateProcess()`](#basic-use-of-createprocessw)). Normally you'd only specify `argv`.
+For simplicity you can get rid of the `executable` parameter and only allow `argv`. Then you lose the ability to have `argv[0]` differ from the executable path.
 
 1. Check for bad inputs:
    * They can't contain `\0`.
@@ -416,7 +419,7 @@ The inputs are: an optional string `executable`, and an optional array of string
 
     If `argv` is null, then instead validate `executable` with this.
 
-    You can allow `%`, but it's potentially unsafe. If you do, then you should escape it as explained in the next steps. [(details)](#escaping-)
+    You can allow `%`, but it's potentially unsafe. If you allow it, then you should escape it as explained in the next steps. [(details)](#escaping-)
 
 7. If this is batch, prepend the CMD invocation:
 
@@ -459,7 +462,7 @@ The inputs are: an optional string `executable`, and an optional array of string
 
                 Otherwise leave those `\` unchanged.
 
-                (Note that if this is the last element, and it's not quoted, and the entire command is quoted because of step 8 or `/c`, then `\`s at the end of this element still do **not** need to be duplicated. They are only duplicated if this element is quoted individually.)
+                (Note that if this is the last element, and it's not quoted, and the entire command is quoted because of step 8 or `/c`, then `\`s at the end of this element still do **not** need to be duplicated. They only need to be duplicated if this element is quoted individually.)
 
             * If you decided to allow `%` on step 6, replace those with `%%cd:~,%`.
 
