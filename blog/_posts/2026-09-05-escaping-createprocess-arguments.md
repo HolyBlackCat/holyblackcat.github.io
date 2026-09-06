@@ -403,9 +403,9 @@ The outputs are: an optional string `executable` (possibly modified compared to 
 For simplicity you can get rid of the `executable` parameter and only allow `argv`. Then you lose the ability to have `argv[0]` differ from the executable path.
 
 1. Check for bad inputs:
-   * They can't contain `\0`.
    * At least one parameter of the two must be specified.
    * If `argv` is specified, it can't be empty.
+   * `executable` and `argv` can't contain `\0`.
 
 2. Let `exe_name` be `executable` if specified, or `argv[0]` otherwise.<br/>
 
