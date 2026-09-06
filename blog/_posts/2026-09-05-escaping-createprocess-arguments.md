@@ -13,12 +13,6 @@ Messing up the escaping can lead to [vulnerabilities](https://flatt.tech/researc
 
 This post explains how to do the escaping and quoting correctly. [Skip to the escaping algorithm.](#the-escaping-algorithm)
 
-## Errata
-
-This was updated on 2026-09-06 to cover the [custom quoting rules](#special-quoting-rules-of-cmd-c) of `cmd /c` and fix minor mistakes.
-
-Minor changes not affecting the escaping algorithm may not be listed here.
-
 ## Intro
 
 As you may know, unlike on POSIX (Linux, etc), on Windows the command line arguments (`argv`) are internally represented as a single long string. There is a WinAPI function to split it to an `argv`-style array, and the C runtime splits it for you when calling your `main()`, but you can still access the original combined string, and interpret it differently if you want. Most applications respect the stock split.
@@ -443,6 +437,18 @@ For simplicity you can get rid of the `executable` parameter and only allow `arg
 
     2. For each element in `argv`:
 
+        * Check if this is a `/c` that needs custom handling. [(details)](#special-quoting-rules-of-cmd-c)<br/>
+            If all of the following are true: (this happens to be mutually exclusive with step 8)
+
+            * We didn't have such `/c` yet.
+            * This is not the `0`th element.
+            * This element equals `/c` (case insensitive).
+            * This is a direct CMD invocation per step 4 (or step 7 was executed).
+
+        * If this is the special `/c` per the previous step, and we haven't encountered argument `/s` yet (case-insensitive, can't be the `0`th element), then write our own <code> /s</code> (with a separating space).
+
+
+
         * Write separating space <code> </code> if it's not the `0`th element (and if the separator doesn't need to be skipped because of the preceding `/c`, see below).
 
         * Decide if this element needs to be quoted:
@@ -468,14 +474,7 @@ For simplicity you can get rid of the `executable` parameter and only allow `arg
 
         * Write closing quote `"` if we're quoting this element.
 
-        * Do the custom handling for for `/c`. [(details)](#special-quoting-rules-of-cmd-c)<br/>
-            If all of the following are true: (this happen to be mutually exclusive with step 8)
-
-            * We didn't have a `/c` yet.
-            * This element equals `/c` (case insensitive).
-            * This is a direct CMD invocation per step 4 (or step 7 was executed).
-
-            Then immediately write <code> "</code> (space and a quote), and then skip writing <code> </code> separator on the next iteration.
+        * If this is the special `/c` (as mentioned earlier), write <code> "</code> (space and a quote), and then skip writing <code> </code> separator on the next iteration.
 
     3. Write closing `"` If the whole command needs to be quoted per step 8, or if you handled `/c` as explained earlier. [(details)](#special-quoting-rules-of-cmd-c)
 
