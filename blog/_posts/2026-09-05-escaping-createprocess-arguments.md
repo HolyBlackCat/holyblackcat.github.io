@@ -331,16 +331,18 @@ Lastly, in all strings check for `\0`, if your language allows them. (For obviou
 
 What characters need to be quoted? (That's different from characters that need [`^` escaping](#basic-batch-escaping), but we [established](#batch-files-running-other-batch-files) that quotes are the superior form of escaping.)
 
-For batch files, we quote the argument if it contains any of: <code> </code> spaces, `\t` tabs, `"` quotes, or any of ``<>&|()[]{}^=;!'+,`~``. This list is approximate, some characters might not be needed. I'm certain about:
+For batch files, we quote the argument if it contains any of: <code> </code> spaces, `\t` tabs, `"` quotes, or any of ``<>&|()[]{}^=;%!'+,`~``. This list is approximate, some characters might not be needed. I'm certain about:
 
 * Spaces, tabs, and `"`, since they're argument separators.
 * `;,=`, since they are apparently also argument separators in batch?! (For `%1`, `%2`, etc.)
 * `<>&|` because they have obvious special meaning (redirection, separating commands).
 * `^` because it's the escape character.
 
-Less certain about the rest. [This article](https://learn.microsoft.com/en-us/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way) claims those to be special characters: `()%!^"<>&|` (not necessarily quotable). I'm excluding `%` because it ignores quotes. I'd also exclude `!`, but it appears in another list I'll mention in a moment. I have no idea what special effect `()` have.
+Unsure about the `%`. Quoting it shouldn't be necessary if it's escaped, but feels safer. If you opt to allow `%` without escaping, then it's probably a good idea to quote it, even if it's not going to stop some issues.
 
-`cmd /?` has another character list in it: `` &()[]{}^=;!'+,`~``. It's mentioned in a slightly different context, so maybe some of those don't need to be quoted in arguments. They omit `<>|` because they're invalid in filenames (and this list is mentioned in the context of filenames), but we clearly need to quote them. They mention `!` despite not mentioning `%`, so I'll quote it just in case. Not sure why ``()[]{}'+`~`` are listed, but I guess it's safer to quote them too.
+Less certain about the rest. [This article](https://learn.microsoft.com/en-us/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way) claims those to be special characters: `()%!^"<>&|` (not necessarily quotable). I have no idea what special effect `()` have.
+
+`cmd /?` has another character list in it: `` &()[]{}^=;!'+,`~``. It's mentioned in a slightly different context, so maybe some of those don't need to be quoted in arguments. They omit `<>|` because they're invalid in filenames (and this list is mentioned in the context of filenames), but we clearly need to quote them. Interestingly, they mention `!` despite not mentioning `%`, so I'll quote it just in case. Not sure why ``()[]{}'+`~`` are listed, but I guess it's safer to quote them too.
 
 ### Special quoting rules of `cmd /c`
 
@@ -465,7 +467,7 @@ For simplicity you can get rid of the `executable` parameter and only allow `arg
 
             * If it's the `0`th element, always quote. [(details)](#quoting-the-executable-name)
 
-            * Quote if the element contains any of: <code> </code> spaces, `\t` tabs, `"` quotes. If this is batch-or-cmd, also check for ``<>&|()[]{}^=;!'+,`~``. [(details)](#what-characters-need-to-be-quoted-in-batch-arguments)
+            * Quote if the element contains any of: <code> </code> spaces, `\t` tabs, `"` quotes. If this is batch-or-cmd, also check for ``<>&|()[]{}^=;%!'+,`~``. [(details)](#what-characters-need-to-be-quoted-in-batch-arguments)
 
         * Write opening quote `"` if we're quoting this element.
 
