@@ -388,6 +388,22 @@ I also recommend enabling batch logic if the executable name is `cmd` or `cmd.ex
 
 Covering any possible spelling of `cmd` seems unnecessary, since the paranoid escaping logic is important only when the executable name is hardcoded but the arguments are user-provided. If the executable name is user-provided, they can already run anything they want.
 
+### Overly long executable name
+
+See: [Maximum Path Length Limitation](https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation).
+
+By default, the executable path length is limited to `MAX_PATH`, which is 260.
+
+To support longer paths, you must find the absolute path to the executable yourself, and normalize it so that:
+
+* Uses `\` and not `/`.
+* Doesn't use `.` and `..`.
+* Doesn't use more than one `\` in a row. (Normally multiple `\`s in a row automatically collapse to one, so `C:\foo\\\\\bar.exe` means `C:\foo\bar.exe`, but here you must remove the extra `\`s yourself.).
+
+Then you prepend `\\?\` to the resulting absolute path, and pass it to `lpApplicationName`.
+
+Leaving `lpApplicationName` null and passing it to `lpCommandLine` doesn't work. Passing it to both does work (then the one in `lpCommandLine` is only passed to `argv[0]`, and that being long is not a problem).
+
 ## The escaping algorithm
 
 If you know you're not running a batch file nor the `cmd` shell, you can use the simplified algorithm from [here](#basic-escaping).
@@ -399,6 +415,8 @@ The inputs are: an optional string `executable`, and a possibly empty array of s
 The outputs are: an optional string `executable` (possibly modified compared to the input), and an optional string combined from `argv`.
 
 For simplicity you can get rid of the `executable` parameter and only allow `argv`. Then you lose the ability to have `argv[0]` differ from the executable path.
+
+If you want to support overly long executable names, replace `executable` as described [here](#overly-long-executable-name) (using `executable` as input if it's specified, or otherwise using `argv[0]` as input).
 
 1. Check for bad inputs:
    * At least one parameter of the two must be specified. Error if both `executable` is null and `argv` is empty.
