@@ -484,7 +484,7 @@ For simplicity you can get rid of the `executable` parameter and only allow `arg
 
                 (Note that if this is the last element, and it's not quoted, and the entire command is quoted because of step 8 or `/c` or `/k`, then `\`s at the end of this element still do **not** need to be duplicated. They only need to be duplicated if this element is quoted individually.)
 
-            * In batch-or-cmd, if step 7 wasn't skipped, replace `%` with `%%cd:~,%`. (It can only appear here if allowed on step 6.)
+            * In batch-or-cmd, if step 7 wasn't skipped, replace `%` with `%%cd:~,%`. (It can only appear here in batch-or-cmd if allowed on step 6.)
 
         * Write closing quote `"` if we're quoting this element.
 
