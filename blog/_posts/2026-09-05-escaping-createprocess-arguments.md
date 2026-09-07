@@ -390,6 +390,8 @@ Covering any possible spelling of `cmd` seems unnecessary, since the paranoid es
 
 ## The escaping algorithm
 
+If you know you're not running a batch file nor the `cmd` shell, you can use the simplified algorithm from [here](#basic-escaping).
+
 If you're using `CreateProcessW()` ([as you probably should](#unicode)) which accepts wide strings, you can either run this algorithm directly on UTF-16 strings, or on UTF-8 strings and then widen the result.
 
 The inputs are: an optional string `executable`, and a possibly empty array of strings `argv` (that correspond to the [two parameters of `CreateProcess()`](#basic-use-of-createprocess)). Normally you'd only specify `argv`.
@@ -482,7 +484,7 @@ For simplicity you can get rid of the `executable` parameter and only allow `arg
 
                 (Note that if this is the last element, and it's not quoted, and the entire command is quoted because of step 8 or `/c` or `/k`, then `\`s at the end of this element still do **not** need to be duplicated. They only need to be duplicated if this element is quoted individually.)
 
-            * If you decided to allow `%` on step 6, replace those with `%%cd:~,%`.
+            * In batch-or-cmd, if step 7 wasn't skipped, replace `%` with `%%cd:~,%`. (It can only appear here if allowed on step 6.)
 
         * Write closing quote `"` if we're quoting this element.
 
