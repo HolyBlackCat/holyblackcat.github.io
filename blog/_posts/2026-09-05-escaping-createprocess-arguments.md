@@ -394,15 +394,15 @@ See: [Maximum Path Length Limitation](https://learn.microsoft.com/en-us/windows/
 
 By default, the executable path length is limited to `MAX_PATH`, which is 260.
 
-To support longer paths, you must find the absolute path to the executable yourself, and normalize it so that:
+To support longer paths, you must find the absolute path to the executable yourself, and normalize it so that it:
 
 * Uses `\` and not `/`.
-* Doesn't use `.` and `..`.
+* Doesn't use `.` and `..` as directory names.
 * Doesn't use more than one `\` in a row. (Normally multiple `\`s in a row automatically collapse to one, so `C:\foo\\\\\bar.exe` means `C:\foo\bar.exe`, but here you must remove the extra `\`s yourself.).
 
 Then you prepend `\\?\` to the resulting absolute path, and pass it to `lpApplicationName`.
 
-Leaving `lpApplicationName` null and passing it to `lpCommandLine` doesn't work. Passing it to both does work (then the one in `lpCommandLine` is only passed to `argv[0]`, and that being long is not a problem).
+Leaving `lpApplicationName` null and passing it to `lpCommandLine` doesn't work. Passing it to both does work (then the one in `lpCommandLine` is only passed to `argv[0]`, and it being long is not a problem).
 
 ## The escaping algorithm
 
