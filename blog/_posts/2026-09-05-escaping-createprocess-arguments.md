@@ -402,6 +402,8 @@ To support longer paths, you must find the absolute path to the executable yours
 
 Then you prepend `\\?\` to the resulting absolute path, and pass it to `lpApplicationName`.
 
+Those paths are still case-insensitive.
+
 Leaving `lpApplicationName` null and passing it to `lpCommandLine` doesn't work. Passing it to both does work (then the one in `lpCommandLine` is only passed to `argv[0]`, and it being long is not a problem).
 
 ## The escaping algorithm
