@@ -451,16 +451,16 @@ If you want to support overly long executable names, replace `executable` as des
 
     The entire step 7 can be skipped, but if you skip it, then you should also reject `!` (and `%`) earlier on step 6. [(details)](#escaping--1)
 
-8. Decide if the entire command needs to be quoted: check if both `executable` is not null and `argv` is not empty, and this is batch per step 5 (if you executed step 7, this will be false, because `executable` is now null, and because it's no longer considered batch). [(details)](#special-quoting-rules-of-cmd-c)
+8. If `argv` is not empty, assemble the command string from it. (Otherwise return null for the command.)
 
-9. If `argv` is not empty, assemble the command string from it. (Otherwise return null for the command.)
+    1. Decide if the entire command needs to be quoted: check if the `executable` is not null, and this is batch per step 5 (if you executed step 7, this will be false, because `executable` is now null, and because it's no longer considered batch). [(details)](#special-quoting-rules-of-cmd-c)
 
-    1. If the whole command needs to be quoted per step 8, write opening quote `"`. [(details)](#special-quoting-rules-of-cmd-c)
+        If yes, write the opening `"`.
 
     2. For each element in `argv`:
 
         * Check if this is a `/c` or `/k` that needs custom handling. [(details)](#special-quoting-rules-of-cmd-c)<br/>
-            Check if all of the following are true: (this happens to be mutually exclusive with step 8)
+            Check if all of the following are true: (this happens to be mutually exclusive with step 8.1)
 
             * This is a direct CMD invocation per step 4 (or step 7 was executed).
             * This is not the `0`th element.
@@ -500,7 +500,7 @@ If you want to support overly long executable names, replace `executable` as des
 
                 Otherwise leave those `\` unchanged.
 
-                (Note that if this is the last element, and it's not quoted, and the entire command is quoted because of step 8 or `/c` or `/k`, then `\`s at the end of this element still do **not** need to be duplicated. They only need to be duplicated if this element is quoted individually.)
+                (Note that if this is the last element, and it's not quoted, and the entire command is quoted because of step 8.1 or `/c` or `/k`, then `\`s at the end of this element still do **not** need to be duplicated. They only need to be duplicated if this element is quoted individually.)
 
             * In batch-or-cmd, if step 7 wasn't skipped, replace `%` with `%%cd:~,%`. (It can only appear here in batch-or-cmd if allowed on step 6.)
 
@@ -508,7 +508,7 @@ If you want to support overly long executable names, replace `executable` as des
 
         * If this is the special `/c` or `/k` (as mentioned earlier), write <code> "</code> (space and a quote), and then skip writing <code> </code> separator on the next iteration.
 
-    3. Write closing `"` If the whole command needs to be quoted per step 8, or if you handled `/c` or `/k` as explained earlier. [(details)](#special-quoting-rules-of-cmd-c)
+    3. Write closing `"` If the whole command needs to be quoted per step 8.1, or if you handled `/c` or `/k` as explained earlier. [(details)](#special-quoting-rules-of-cmd-c)
 
 As you can see, this has some knobs for batch files. I'd suggest exposing the following modes as a setting:
 
