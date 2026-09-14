@@ -129,7 +129,7 @@ This method is sufficient if you're running an executable and [not a batch file]
 
 If an argument (or the program name) is empty or contains spaces or tabs (<code> </code>, `\t`), it must be quoted with `"`. Unnecessary quoting doesn't do any harm.
 
-It's safer to always quote the program name even if it contains no spaces, [more on that later](#quoting-the-executable-name).
+It's safer to always quote the program name in `lpCommandLine` even if it contains no spaces, [more on that later](#quoting-the-executable-name). This is only needed if `lpApplicationName` is null.
 
 Existing `"` can be quoted either as `""` or as `\"`. If you use `""`, then the entire argument must be quoted even if it doesn't contain spaces or tabs (otherwise `""` becomes an empty string, this is because partially quoting an argument is allowed too, but it's not useful to us).
 
@@ -366,6 +366,8 @@ Lastly, the executable name passed to `CreateProcess()` has a few quirks that ne
 
 First of all, when passed in the second argument (`lpCommandLine`) of `CreateProcess()`, it **must** be quoted regardless of the contents. If not quoted, then `C:\foo bar.exe` is ambiguous between running `C:\foo bar.exe` and running `C:\foo.exe` with argument `bar.exe`. It'll check different paths and run the one that exists (the [docs](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw) say it tries shorter ones first). Quotes disable this behavior and make it not ambiguous.
 
+This is only necessary if `lpApplicationName` is null.
+
 ### Trailing garbage in executable name
 
 Secondly, you should error if the executable name contains any trailing <code> </code> spaces or `.` dots. Or alternatively remove them yourself. (Do this for `lpApplicationName` if specified, and otherwise for the first part of `lpCommandLine`.)
@@ -487,7 +489,7 @@ If you want to support overly long executable names, replace `executable` as des
 
         * Decide if this element needs to be quoted:
 
-            * If it's the `0`th element, always quote. [(details)](#quoting-the-executable-name)
+            * If `executable` is null and this is the `0`th element, quote it regardless of the contents. [(details)](#quoting-the-executable-name)
 
             * Quote if the element contains any of: <code> </code> spaces, `\t` tabs, `"` quotes. If this is batch-or-cmd, also check for ``<>&|()[]{}^=;%!'+,`~``. [(details)](#what-characters-need-to-be-quoted-in-batch-arguments)
 
