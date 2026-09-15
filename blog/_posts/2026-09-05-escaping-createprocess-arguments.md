@@ -390,6 +390,8 @@ I also recommend enabling batch logic if the executable name is `cmd` or `cmd.ex
 
 Covering any possible spelling of `cmd` seems unnecessary, since the paranoid escaping logic is important only when the executable name is hardcoded but the arguments are user-provided. If the executable name is user-provided, they can already run anything they want.
 
+Since `cmd` and `cmd.exe` are not absolute names (and not relative to the current directory), they can't meaningfully appear as `lpApplicationName`, so you don't have to check that. You only need to check the first element of `lpCommandLine`.
+
 ### Overly long executable name
 
 See: [Maximum Path Length Limitation](https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation).
@@ -431,8 +433,9 @@ If you want to support overly long executable names, replace `executable` as des
 3. Error if `exe_name` ends with <code> </code> space or `.` dot. [(details)](#trailing-garbage-in-executable-name)<br/>
    Or alternatively remove any trailing spaces and dots from it yourself (could be more than one). If you modify it, propagate the same change to `executable` or `argv[0]`, depending on where you took it from.
 
-4. Check if this is a direct CMD invocation: check if `exe_name` equals `cmd` or `cmd.exe`, case-insensitive. [(details)](#how-to-check-if-its-a-batch-file)<br/>
-    This is best-effort, we don't need to catch all possible spellings of CMD, see link.
+4. Check if this is a direct CMD invocation: check that `argv` is not empty and `argv[0]` equals `cmd` or `cmd.exe`, case-insensitive. [(details)](#how-to-check-if-its-a-batch-file)<br/>
+    This is best-effort, we don't need to catch all possible spellings of CMD, see link.<br/>
+    We're not checking `executable` because it doesn't respect PATH, so can't accept those spellings.
 
 5. Check if this is a batch file: check if `exe_name` ends with `.bat` or `.cmd`, case-insensitive. [(details)](#how-to-check-if-its-a-batch-file)
 
