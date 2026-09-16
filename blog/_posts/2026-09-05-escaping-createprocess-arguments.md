@@ -478,7 +478,7 @@ If you want to support overly long executable names, replace `executable` as des
 
         * If this is the special `/c` or `/k` per the previous step, insert some extra arguments if we haven't encountered them yet: `/d`, `/e:on`, `/v:off`, `/s`.
 
-            Here everything other than `/s` is optional, and just ensures sane settings. Perhaps you should skip those optional arguments if you also skip step 7.
+            Here everything other than `/s` is optional, and just ensures sane settings. Perhaps you should skip those optional arguments if you also skip step 7. But if you're escaping `%` (as `%%cd:~,%`), then `/e:on` has to stay even if the user tries to disable it (either add your own `/e:on` before `/c` to override any preceding `/e...`, or complain if the user passes `/e:off`, case-insensitive).
 
             Have a bool for each of those. Start tracking those arguments if this is a direct CMD invocation per step `4`, and stop tracking when hitting the special `/c` or `/k`.
 
