@@ -352,11 +352,11 @@ This can happen if the next thing after `/c` or `/k` (after whitespace) is a `"`
 
 For example, if given `cmd /c "foo.bat" "&calc.exe"`, it removes the outer quotes and resolves to `foo.bat" "&calc.exe`, which runs `calc.exe`.
 
-This can't be disabled, so we have to lean into it and **always quote the rest of the command after `/c` or `/k`**.
+This can't be reliably disabled, so we have to lean into it and **always quote the rest of the command after `/c` or `/k`**.
 
-There is some convoluted corner case where this behavior gets disabled (see `cmd /?`), but we don't want to deal with that, so we **pass `/s`** to get rid of that corner case and unconditionally remove our quotes.
+There is some convoluted corner case where this behavior gets disabled automatically (see `cmd /?`), but we don't want to deal with that, so we **pass `/s`** to get rid of that corner case and unconditionally remove the quotes.
 
-Even if you didn't prepend your own `cmd ... /c`, you still have to deal with this if you specified both `lpApplicationName` and `lpCommandLine`, and `lpApplicationName` is a batch file. Then you have to quote the entire `lpCommandLine`. We have nowhere to pass our `/s` in that case, but it's not an issue, since the quotes are always removed when there are more than two of them, and we'll have 4 because we also always quote the first element in `lpCommandLine` for [unrelated reasons](#quoting-the-executable-name).
+Even if you didn't prepend your own `cmd ... /c`, you still have to deal with this if you specified both `lpApplicationName` and `lpCommandLine`, and `lpApplicationName` is a batch file. Then you have to quote the entire `lpCommandLine`. We have nowhere to pass our `/s` in that case, but we can work around that by quoting the first element of `lpCommandLine` (even if its contents don't need quoting), since having more than 2 quotes (we'll now have 4) is one of the conditions that disables the corner case quote preservation (again, see `cmd /?`).
 
 ## The executable name
 
@@ -366,7 +366,9 @@ Lastly, the executable name passed to `CreateProcess()` has a few quirks that ne
 
 First of all, when passed in the second argument (`lpCommandLine`) of `CreateProcess()`, it **must** be quoted regardless of the contents. If not quoted, then `C:\foo bar.exe` is ambiguous between running `C:\foo bar.exe` and running `C:\foo.exe` with argument `bar.exe`. It'll check different paths and run the one that exists (the [docs](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw) say it tries shorter ones first). Quotes disable this behavior and make it not ambiguous.
 
-This is only necessary if `lpApplicationName` is null.
+You'd think that the argument right after `cmd /c` would need the same form of quoting, but experiments show that it doesn't. CMD must be doing something special. Try e.g. `cmd /s /c "foo bar.exe"`, where `foo bar.exe` is an executable. It fails to start it, even though `CreateProcess()` with the same string works.
+
+Normally you only need this quoting if `lpApplicationName` is null. The only exception is when you [quote the entire command](#special-quoting-rules-of-cmd-c). There we need *some* quotes to compensate for the missing `/s`.
 
 ### Trailing garbage in executable name
 
@@ -492,7 +494,11 @@ If you want to support overly long executable names, replace `executable` as des
 
         * Decide if this element needs to be quoted:
 
-            * If `executable` is null and this is the `0`th element, quote it regardless of the contents. [(details)](#quoting-the-executable-name)
+            * If the following is true, quote the element regardless of the contents: [(details)](#quoting-the-executable-name)
+
+                * This is the `0`th element, and
+
+                * `executable` is null, or we're quoting the entire command per step 8.1.
 
             * Quote if the element contains any of: <code> </code> spaces, `\t` tabs, `"` quotes. If this is batch-or-cmd, also check for ``<>&|()[]{}^=;%!'+,`~``. [(details)](#what-characters-need-to-be-quoted-in-batch-arguments)
 
