@@ -325,6 +325,8 @@ In addition to `%` (and optionally `!` if you don't want to prepend `cmd ... /v:
 
 Those need to be banned in the batch file name too, since when it's passed to CMD, it undergoes the same expansion as everything else. E.g. trying to run `foo%FOO%bar.bat` with `FOO=42` will actually run `foo42bar.bat`. (If both `lpApplicationName` and `lpCommandLine` are specified, then `lpApplicationName` is not passed to CMD and doesn't need to be validated.)
 
+If `lpApplicationName` is specified and `lpCommandLine` is null, there's no `/e:on /v:off`, so `%` and `!` must be rejected there.
+
 Lastly, in all strings check for `\0`, if your language allows them. (For obvious reasons: `CreateProcess()` needs null-terminated strings.)
 
 ### What characters need to be quoted in batch arguments?
@@ -441,11 +443,9 @@ If you want to support overly long executable names, replace `executable` as des
 
 5. Check if this is a batch file: check if `exe_name` ends with `.bat` or `.cmd`, case-insensitive. [(details)](#how-to-check-if-its-a-batch-file)
 
-6. If this is batch-or-cmd (per steps 4, 5), perform additional argument validation. Error if any element of `argv` (including `0`th) contains any of: `%`, `\n` (line break), `\r` (carriage return). [(details)](#what-characters-need-to-be-banned-in-batch-arguments)
+6. If this is batch (per step 5) and `argv` is empty, perform additional validation for `executable`. Error if it contains any of: `%`, `!`, `\n` (line break), `\r` (carriage return). [(details)](#what-characters-need-to-be-banned-in-batch-arguments)
 
-    If `argv` is empty, then instead validate `executable` with this.
-
-    You can allow `%`, but it's potentially unsafe. If you allow it, then you should escape it as explained in the next steps. [(details)](#escaping-)
+    In this specific place `%` can't be escaped. We also can't allow `!` because `/v:on` could've been enabled in teh registry.
 
 7. If this is batch, prepend the CMD invocation:
 
@@ -468,6 +468,18 @@ If you want to support overly long executable names, replace `executable` as des
 
     2. For each element in `argv`:
 
+        * For cmd-or-batch, perform additional argument validation. [(details)](#what-characters-need-to-be-banned-in-batch-arguments)
+
+          For batch this is performed for every element. For cmd this is only performed for elements after `/c` or `/k` (case-insensitive, see next step).
+
+          Reject `\n` (line break), `\r` (carriage return).
+
+          Only reject `%` if before `/c` or `/k` (case-insensitive) you had no arguments starting with `/e` (case-insensitive), or if the last such argument started with `/e:off` (case-insensitive) (note, "started with" rather than being equal). I.e. reject `%` if `/e` is disabled or unknown.
+
+          Only reject `!` if before `/c` or `/k` (case-insensitive) if you had at least one argument starting with `/v` (case-insensitive), and the last such argument didn't start with `/v:off` (case-insensitive) (note, "started with" rather than being equal). I.e. reject `!` if `/v` is enabled or unknown.
+
+          Note that custom arguments added to `argv` on some other steps do count for this.
+
         * Check if this is a `/c` or `/k` that needs custom handling. [(details)](#special-quoting-rules-of-cmd-c)<br/>
             Check if all of the following are true: (this happens to be mutually exclusive with step 8.1)
 
@@ -478,7 +490,7 @@ If you want to support overly long executable names, replace `executable` as des
 
         * If this is the special `/c` or `/k` per the previous step, insert some extra arguments if we haven't encountered them yet: `/d`, `/e:on`, `/v:off`, `/s`.
 
-            Here everything other than `/s` is optional, and just ensures sane settings. Perhaps you should skip those optional arguments if you also skip step 7. But if you're escaping `%` (as `%%cd:~,%`), then `/e:on` has to stay even if the user tries to disable it (either add your own `/e:on` before `/c` to override any preceding `/e...`, or complain if the user passes `/e:off`, case-insensitive).
+            Here everything other than `/s` is optional, and just ensures sane settings. Perhaps you should skip those optional arguments if you also skip step 7.
 
             Have a bool for each of those. Start tracking those arguments if this is a direct CMD invocation per step `4`, and stop tracking when hitting the special `/c` or `/k`.
 
@@ -515,7 +527,7 @@ If you want to support overly long executable names, replace `executable` as des
 
                 (Note that if this is the last element, and it's not quoted, and the entire command is quoted because of step 8.1 or `/c` or `/k`, then `\`s at the end of this element still do **not** need to be duplicated. They only need to be duplicated if this element is quoted individually.)
 
-            * In batch-or-cmd, if step 7 wasn't skipped, replace `%` with `%%cd:~,%`. (It can only appear here in batch-or-cmd if allowed on step 6.)
+            * In batch-or-cmd, if step 7 wasn't skipped, replace `%` with `%%cd:~,%`. (Assuming it passed earlier argument validation.)
 
         * Write closing quote `"` if we're quoting this element.
 
