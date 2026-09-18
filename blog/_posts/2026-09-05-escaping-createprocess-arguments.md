@@ -356,9 +356,14 @@ For example, if given `cmd /c "foo.bat" "&calc.exe"`, it removes the outer quote
 
 This can't be reliably disabled, so we have to lean into it and **always quote the rest of the command after `/c` or `/k`**.
 
-There is some convoluted corner case where this behavior gets disabled automatically (see `cmd /?`), but we don't want to deal with that, so we **pass `/s`** to get rid of that corner case and unconditionally remove the quotes.
+There is some convoluted corner case where this behavior gets disabled automatically (see `cmd /?`), so it may keep the quotes instead of removing them. But we don't want to deal with that. There are two good ways to ensure the quotes are always removed:
 
-Even if you didn't prepend your own `cmd ... /c`, you still have to deal with this if you specified both `lpApplicationName` and `lpCommandLine`, and `lpApplicationName` is a batch file. Then you have to quote the entire `lpCommandLine`. We have nowhere to pass our `/s` in that case, but we can work around that by quoting the first element of `lpCommandLine` (even if its contents don't need quoting), since having more than 2 quotes (we'll now have 4) is one of the conditions that disables the corner case quote preservation (again, see `cmd /?`).
+* **Pass `/s`** (which disables the corner case), or:
+* Ensure we have more than two quotes (which also disables it). E.g. quote the first argument after `/c`-or-`/k` regardless of the contents, so `cmd /c ""foo" bar"`.
+
+Even if you don't have `cmd ... /c` in the input, you still have to deal with this if you specified both `lpApplicationName` and `lpCommandLine`, and `lpApplicationName` is a batch file. Then you have to quote the entire `lpCommandLine`. We have nowhere to pass our `/s` in that case, so we have to use the second option.
+
+If you have `cmd ... /c`, then both options are viable. This blog post arbitrarily recommends `/s`.
 
 ## The executable name
 
@@ -445,7 +450,7 @@ If you want to support overly long executable names, replace `executable` as des
 
 6. If this is batch (per step 5) and `argv` is empty, perform additional validation for `executable`. Error if it contains any of: `%`, `!`, `\n` (line break), `\r` (carriage return). [(details)](#what-characters-need-to-be-banned-in-batch-arguments)
 
-    In this specific place `%` can't be escaped. We also can't allow `!` because `/v:on` could've been enabled in teh registry.
+    In this specific place `%` can't be escaped. We also can't allow `!` because `/v:on` could've been enabled in the registry (giving `!` special meaning).
 
 7. If this is batch, prepend the CMD invocation:
 
@@ -458,7 +463,7 @@ If you want to support overly long executable names, replace `executable` as des
 
     * Update the bools from steps 4 and 5: now "is cmd" = true, "is batch" = false.
 
-    The entire step 7 can be skipped, but if you skip it, then you should also reject `!` (and `%`) earlier on step 6. [(details)](#escaping--1)
+    The entire step 7 can be skipped, but then you have to reject [`%`](#escaping-) and [`!`](#escaping--1) (see below), because you can't be certain about their behavior without those flags.
 
 8. If `argv` is not empty, assemble the command string from it. (Otherwise return null for the command.)
 
@@ -466,45 +471,55 @@ If you want to support overly long executable names, replace `executable` as des
 
         If yes, write the opening `"`.
 
-    2. For each element in `argv`:
+    2. If this is a direct CMD invocation (per step 4), introduce some variables to track its flags:
 
-        * For cmd-or-batch, perform additional argument validation. [(details)](#what-characters-need-to-be-banned-in-batch-arguments)
+        * Bool for `/c`-or-`/k`, initially false.
+        * Bools for `/d`, `/s`, initially false.
+        * Optional bools for `/v` and `/e`, initially null.
 
-          For batch this is performed for every element. For cmd this is only performed for elements after `/c` or `/k` (case-insensitive, see next step).
+    3. For each element in `argv`:
 
-          Reject `\n` (line break), `\r` (carriage return).
+        1. Determine if this element needs cmd-specific handling. For batch (step 5), this is true for every element. For direct CMD invocation (step 4), this is initially false, and becomes true after encountering `/c`-or-`/k` (see flag in step 8.2).
 
-          Only reject `%` if before `/c` or `/k` (case-insensitive) you had no arguments starting with `/e` (case-insensitive), or if the last such argument started with `/e:off` (case-insensitive) (note, "started with" rather than being equal). I.e. reject `%` if `/e` is disabled or unknown.
+        2. If this element needs cmd-specific handling (see above), validate it. [(details)](#what-characters-need-to-be-banned-in-batch-arguments)
 
-          Only reject `!` if before `/c` or `/k` (case-insensitive) if you had at least one argument starting with `/v` (case-insensitive), and the last such argument didn't start with `/v:off` (case-insensitive) (note, "started with" rather than being equal). I.e. reject `!` if `/v` is enabled or unknown.
+            Error if it contains `\n` (line break) or `\r` (carriage return).
 
-          Note that custom arguments added to `argv` on some other steps do count for this.
+            If it contains `%`, you can either error unconditionally, or try to escape it (escaping can be unsafe on certain batch files, [details](#escaping-)). If you want to allow it, check if it's currently possible to escape. This means: For batch, always error. For direct CMD invocation, check the `/e` flag (step 8.2), and error if it's null or false.
 
-        * Check if this is a `/c` or `/k` that needs custom handling. [(details)](#special-quoting-rules-of-cmd-c)<br/>
-            Check if all of the following are true: (this happens to be mutually exclusive with step 8.1)
+            Error if it contains `!` if it has special behavior enabled. This means: For batch, always error. For cmd,
 
-            * This is a direct CMD invocation per step 4 (or step 7 was executed).
-            * This is not the `0`th element.
-            * We didn't have such `/c` or `/k` yet. (They are mutually exclusive. As soon as you've seen one, stop checking for both of them.)
-            * This element equals `/c` or `/k`, case insensitive.
+            Note that custom arguments added to `argv` on some other steps do count for this.
 
-        * If this is the special `/c` or `/k` per the previous step, insert some extra arguments if we haven't encountered them yet: `/d`, `/e:on`, `/v:off`, `/s`.
+        3. If this is a direct CMD invocation, perhaps this is a flag that we need to analyze. [(details)](#special-quoting-rules-of-cmd-c)<br/>
 
-            Here everything other than `/s` is optional, and just ensures sane settings. Perhaps you should skip those optional arguments if you also skip step 7.
+            Skip this for the `0`th element.
 
-            Have a bool for each of those. Start tracking those arguments if this is a direct CMD invocation per step `4`, and stop tracking when hitting the special `/c` or `/k`.
+            Skip this if we ever encountered `/c`-or-`/k` (check flag from step 8.2).
 
-            Each of those should be checked case-insensitive. Only compare the first two characters of the element, since they can be followed by garbage and still get enabled.
+            Check if this element starts with any of the following, case-insensitive:
 
-            Don't check the `0`th element.
+            * `/d` or `/s` - set the respective flag to true (see step 8.2).
+            * `/e` or `/v` - if the remainder of this element starts with `:off` (case-insensitive), set the respective flag to false (see step 8.2), otherwise set it to true.
 
-            When inserting those arguments, prepend a separating space to each.
+            * `/c` or `/k` - set their shared flag to true (see step 8.2).
 
-            Unlike `/v` and `/e`, `/d` doesn't have a negative version, so with this logic the user can't override it (so you should have a knob to disable `/d`,`/e:on`,`/v:off`).
+              Additionally if those are followed by more characters, then the remainder must be split into a separate element, a separate iteration of 8.2 needs to run for it.
 
-        * Write separating space <code> </code> if it's not the `0`th element (and if the separator doesn't need to be skipped because of the preceding `/c` or `/k`, see below).
+        4. If this is `/c`-or-`/k` per the previous step, insert some extra arguments if we haven't encountered them yet (according to flags in 8.2):
 
-        * Decide if this element needs to be quoted:
+            * `/d` if the flag is false.
+            * `/e:on` if the flag is null.
+            * `/v:off` if the flag is null.
+            * `/s` if the flag is false.
+
+            Each of those of course needs a separating space before it.
+
+            Here everything other than `/s` is optional, and just ensures sane settings. Perhaps you should skip those optional arguments if you opted to skip step 7.
+
+        5. Write separating space <code> </code> if it's not the `0`th element (and if the separator doesn't need to be skipped because of the preceding `/c`-or-`/k`, see below).
+
+        6. Decide if this element needs to be quoted:
 
             * If the following is true, quote the element regardless of the contents: [(details)](#quoting-the-executable-name)
 
@@ -512,11 +527,11 @@ If you want to support overly long executable names, replace `executable` as des
 
                 * `executable` is null, or we're quoting the entire command per step 8.1.
 
-            * Quote if the element contains any of: <code> </code> spaces, `\t` tabs, `"` quotes. If this is batch-or-cmd, also check for ``<>&|()[]{}^=;%!'+,`~``. [(details)](#what-characters-need-to-be-quoted-in-batch-arguments)
+            * Quote if the element contains any of: <code> </code> spaces, `\t` tabs, `"` quotes. If this is argument uses cmd-specific handling (see step 8.3.2 above), also check for ``<>&|()[]{}^=;%!'+,`~``. [(details)](#what-characters-need-to-be-quoted-in-batch-arguments)
 
-        * Write opening quote `"` if we're quoting this element.
+        7. Write opening quote `"` if we're quoting this element.
 
-        * Write the modified element string:
+        8. Write the modified element string:
             * Replace any `"` with `""`.
             * Replace any sequence of 1+ `\` backslashes with twice as many backslashes **only if**:
 
@@ -527,24 +542,23 @@ If you want to support overly long executable names, replace `executable` as des
 
                 (Note that if this is the last element, and it's not quoted, and the entire command is quoted because of step 8.1 or `/c` or `/k`, then `\`s at the end of this element still do **not** need to be duplicated. They only need to be duplicated if this element is quoted individually.)
 
-            * In batch-or-cmd, if step 7 wasn't skipped, replace `%` with `%%cd:~,%`. (Assuming it passed earlier argument validation.)
+            * If this element uses cmd-specific handling (see step 8.3.2 above), replace `%` with `%%cd:~,%`.
 
-        * Write closing quote `"` if we're quoting this element.
+        9. Write closing quote `"` if we're quoting this element.
 
-        * If this is the special `/c` or `/k` (as mentioned earlier), write <code> "</code> (space and a quote), and then skip writing <code> </code> separator on the next iteration.
+        10. If this is `/c`-or-`/k` (per step 8.3.3), write <code> "</code> (space and a quote), and then skip writing <code> </code> separator on the next iteration.
 
     3. Write closing `"` If the whole command needs to be quoted per step 8.1, or if you handled `/c` or `/k` as explained earlier. [(details)](#special-quoting-rules-of-cmd-c)
 
-As you can see, this has some knobs for batch files. I'd suggest exposing the following modes as a setting:
+As you can see, this has some knobs for cmd and batch. I suggest exposing the following settings:
 
-Mode|Prepend `cmd /d /e:on /v:off /s /c `|Allow&nbsp;`%`|Allow&nbsp;`!`|Comment
----|---|---|---|---
-Default|Yes|No|Yes|Seems to be a good default.
-Relaxed|Yes|Yes<br/>(escaped)|Yes|Can be unsafe on some batch files.
-Keep registry settings|No|No|No|Safe, but the user messing with registry keys can affect your batch files.
-Unsafe|No|Yes (not escaped)|Yes|Unsafe.
+1. A bool, whether to prepend `cmd ... /c` to batch files (step 7), and at the same time whether to add missing flags to CMD invocations (step 8.3.4).
 
-This could be exposed as an enum, or perhaps two bools (`keep_registry_settings` to enable 3 or 4, and `unsafe` to enable 2 or 4).
+2. A enum, how to handle `%` and `!` in cmd-or-batch arguments:
+
+    * Default: Error on `%` unconditionally. Error on `!` if we don't have `/v:off` (passed by the user or added by us).
+    * Relaxed: Allow and escape `%` if we have `/e:on`, otherwise error on it. For `!`, same behavior as in the previous mode.
+    * As is: Allow `%` and `!` unconditionally and don't escape them.
 
 &nbsp;
 
