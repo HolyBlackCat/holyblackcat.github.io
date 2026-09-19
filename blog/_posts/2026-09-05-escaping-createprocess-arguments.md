@@ -442,7 +442,7 @@ If you want to support overly long executable names, replace `executable` as des
 3. Error if `exe_name` ends with <code> </code> space or `.` dot. [(details)](#trailing-garbage-in-executable-name)<br/>
    Or alternatively remove any trailing spaces and dots from it yourself (could be more than one). If you modify it, propagate the same change to `executable` or `argv[0]`, depending on where you took it from.
 
-4. Check if this is a direct CMD invocation: check that `argv` is not empty and `argv[0]` equals `cmd` or `cmd.exe`, case-insensitive. [(details)](#how-to-check-if-its-a-batch-file)<br/>
+4. Check if this is a direct CMD invocation: check that `executable` is empty and `argv[0]` equals `cmd` or `cmd.exe`, case-insensitive. [(details)](#how-to-check-if-its-a-batch-file)<br/>
     This is best-effort, we don't need to catch all possible spellings of CMD, see link.<br/>
     We're not checking `executable` because it doesn't respect PATH, so can't accept those spellings.
 
