@@ -504,7 +504,7 @@ If you want to support overly long executable names, replace `executable` as des
 
             * `/c` or `/k` - set their shared flag to true (see step 8.2).
 
-              Additionally if those are followed by more characters, then the remainder must be split into a separate element, a separate iteration of 8.2 needs to run for it.
+              Additionally if `/c` or `/k` are followed by more characters, then the remainder must be split into a separate element, a separate iteration of 8.2 needs to run for it.
 
         4. If this is `/c`-or-`/k` per the previous step, insert some extra arguments if we haven't encountered them yet (according to flags in 8.2):
 
